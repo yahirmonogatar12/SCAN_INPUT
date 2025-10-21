@@ -1,0 +1,22 @@
+# Core dependencies
+PyQt6>=6.4.0
+python-dotenv>=1.0.0
+mysql-connector-python>=8.0.33
+
+# Database
+# SQLite viene con Python
+
+# Encryption (opcional - para futuro)
+cryptography>=41.0.0
+
+# Logging y monitoreo
+# logging viene con Python
+
+# Desarrollo y testing
+pytest>=7.4.0
+pytest-qt>=4.2.0
+black>=23.7.0
+flake8>=6.1.0
+
+# Build tools
+pyinstaller>=5.13.0

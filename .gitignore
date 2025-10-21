@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+db.sqlite3
+app/db.sqlite3
+
+# Logs
+*.log
+logs/
+app.log*
+
+# Environment variables
+.env
+.env.local
+data/.env
+
+# IDEs
+.vscode/
+.kiro
+.kiro/steering
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# PyInstaller
+# *.spec  # ✅ INCLUIR spec file en el repo (es necesario para compilar)
+build/
+dist/
+
+# Installers
+installers/*.exe
+installers/*.msi
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Secrets
+*.key
+*.pem
+*.crt
+config/secrets.json

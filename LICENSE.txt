@@ -1,0 +1,36 @@
+ACUERDO DE LICENCIA DE SOFTWARE
+INPUT SCAN - SISTEMA DE ESCANEO PROFESIONAL
+
+Copyright © 2025 MES - Manufacturing Execution System
+
+TÉRMINOS Y CONDICIONES:
+
+1. CONCESIÓN DE LICENCIA
+Se le concede una licencia no exclusiva para usar este software en sus instalaciones 
+de manufactura, sujeto a los términos y condiciones establecidos en este acuerdo.
+
+2. RESTRICCIONES
+- No puede redistribuir este software sin autorización expresa.
+- No puede realizar ingeniería inversa, descompilar o desarmar el software.
+- No puede modificar o crear trabajos derivados del software.
+
+3. PROPIEDAD INTELECTUAL
+Todos los derechos, títulos e intereses en el software permanecen con 
+MES - Manufacturing Execution System.
+
+4. GARANTÍA LIMITADA
+El software se proporciona "COMO ESTÁ" sin garantías de ningún tipo, ya sean 
+expresas o implícitas.
+
+5. LIMITACIÓN DE RESPONSABILIDAD
+En ningún caso MES será responsable de daños directos, indirectos, incidentales 
+o consecuentes que resulten del uso de este software.
+
+6. TERMINACIÓN
+Esta licencia es efectiva hasta que sea terminada. Puede terminarla en cualquier 
+momento desinstalando el software.
+
+Al instalar y usar este software, usted acepta estar sujeto a los términos de 
+este acuerdo de licencia.
+
+CONTACT: soporte@mes-manufacturing.com
