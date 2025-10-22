@@ -860,7 +860,7 @@ class MainWindow(QtWidgets.QMainWindow):
         header_layout.setSpacing(8)
         
         # Título
-        title = QtWidgets.QLabel(" Historial de Escaneos (Últimos 20)")
+        title = QtWidgets.QLabel("Historial de Escaneos (Ultimos 20)")
         title.setStyleSheet("""
             color: #3498db;
             font-size: 12px;
@@ -868,10 +868,32 @@ class MainWindow(QtWidgets.QMainWindow):
             background: transparent;
         """)
         header_layout.addWidget(title)
-        
+
         header_layout.addStretch(1)
-        
-        # Botón: Reducir altura
+
+        # Botón: Ver historial completo
+        btn_full_history = QtWidgets.QPushButton("Ver Todo")
+        btn_full_history.setFixedSize(80, 24)
+        btn_full_history.setToolTip("Ver historial completo en ventana separada")
+        btn_full_history.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                border: 1px solid #229954;
+                border-radius: 4px;
+                color: white;
+                font-weight: bold;
+                font-size: 10px;
+            }
+            QPushButton:hover {
+                background-color: #2ecc71;
+                border-color: #27ae60;
+            }
+            QPushButton:pressed {
+                background-color: #1e8449;
+            }
+        """)
+        btn_full_history.clicked.connect(self._show_full_history_window)
+        header_layout.addWidget(btn_full_history)        # Botón: Reducir altura
         btn_decrease = QtWidgets.QPushButton("")
         btn_decrease.setFixedSize(30, 24)
         btn_decrease.setToolTip("Reducir altura del historial")
@@ -1000,7 +1022,406 @@ class MainWindow(QtWidgets.QMainWindow):
             self.scan_history_main_container.setMinimumHeight(new_height)
             self.scan_history_main_container.setMaximumHeight(new_height)
             self.scan_history_height_label.setText(f"{new_height}px")
-    
+
+    def _show_full_history_window(self):
+        """Muestra una ventana con el historial completo de scans con filtros de fecha"""
+        try:
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+
+            # Crear ventana modal
+            dialog = QtWidgets.QDialog(self)
+            dialog.setWindowTitle("Historial Completo de Escaneos")
+            dialog.setMinimumSize(1200, 700)
+            dialog.setStyleSheet("""
+                QDialog {
+                    background-color: #2C2C2C;
+                }
+            """)
+
+            layout = QtWidgets.QVBoxLayout(dialog)
+            layout.setContentsMargins(15, 15, 15, 15)
+
+            # Título
+            title = QtWidgets.QLabel("Historial Completo de Escaneos")
+            title.setStyleSheet("""
+                color: #3498db;
+                font-size: 16px;
+                font-weight: bold;
+            """)
+            layout.addWidget(title)
+            
+            # Panel de filtros
+            filter_frame = QtWidgets.QFrame()
+            filter_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #1E1E1E;
+                    border: 1px solid #3C3940;
+                    border-radius: 4px;
+                    padding: 10px;
+                }
+            """)
+            filter_layout = QtWidgets.QHBoxLayout(filter_frame)
+            
+            # Buscador de código
+            search_label = QtWidgets.QLabel("Buscar:")
+            search_label.setStyleSheet("color: #ecf0f1; font-weight: bold;")
+            filter_layout.addWidget(search_label)
+            
+            search_input = QtWidgets.QLineEdit()
+            search_input.setPlaceholderText("Código completo o parcial...")
+            search_input.setFixedWidth(250)
+            search_input.setStyleSheet("""
+                QLineEdit {
+                    background-color: #2C2C2C;
+                    color: #ecf0f1;
+                    border: 1px solid #3C3940;
+                    padding: 5px;
+                    border-radius: 3px;
+                }
+                QLineEdit:focus {
+                    border: 1px solid #3498db;
+                }
+            """)
+            filter_layout.addWidget(search_input)
+            
+            filter_layout.addSpacing(20)
+            
+            # Fecha desde
+            fecha_desde_label = QtWidgets.QLabel("Desde:")
+            fecha_desde_label.setStyleSheet("color: #ecf0f1; font-weight: bold;")
+            filter_layout.addWidget(fecha_desde_label)
+            
+            fecha_desde = QtWidgets.QDateEdit()
+            today = datetime.now(ZoneInfo("America/Monterrey"))
+            fecha_desde.setDate(today.date())
+            fecha_desde.setCalendarPopup(True)
+            fecha_desde.setStyleSheet("""
+                QDateEdit {
+                    background-color: #2C2C2C;
+                    color: #ecf0f1;
+                    border: 1px solid #3C3940;
+                    padding: 5px;
+                    border-radius: 3px;
+                }
+                QDateEdit::drop-down {
+                    border: none;
+                }
+            """)
+            filter_layout.addWidget(fecha_desde)
+            
+            # Fecha hasta
+            fecha_hasta_label = QtWidgets.QLabel("Hasta:")
+            fecha_hasta_label.setStyleSheet("color: #ecf0f1; font-weight: bold;")
+            filter_layout.addWidget(fecha_hasta_label)
+            
+            fecha_hasta = QtWidgets.QDateEdit()
+            fecha_hasta.setDate(today.date())
+            fecha_hasta.setCalendarPopup(True)
+            fecha_hasta.setStyleSheet("""
+                QDateEdit {
+                    background-color: #2C2C2C;
+                    color: #ecf0f1;
+                    border: 1px solid #3C3940;
+                    padding: 5px;
+                    border-radius: 3px;
+                }
+                QDateEdit::drop-down {
+                    border: none;
+                }
+            """)
+            filter_layout.addWidget(fecha_hasta)
+            
+            # Filtro de tipo
+            tipo_combo = QtWidgets.QComboBox()
+            tipo_combo.addItems(["Todos", "Solo OK", "Solo NG"])
+            tipo_combo.setStyleSheet("""
+                QComboBox {
+                    background-color: #2C2C2C;
+                    color: #ecf0f1;
+                    border: 1px solid #3C3940;
+                    padding: 5px;
+                    border-radius: 3px;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #2C2C2C;
+                    color: #ecf0f1;
+                    selection-background-color: #3498db;
+                }
+            """)
+            filter_layout.addWidget(tipo_combo)
+            
+            filter_layout.addStretch()
+            
+            # Botón filtrar
+            btn_filtrar = QtWidgets.QPushButton("Filtrar")
+            btn_filtrar.setFixedSize(100, 30)
+            btn_filtrar.setStyleSheet("""
+                QPushButton {
+                    background-color: #3498db;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #2980b9;
+                }
+            """)
+            filter_layout.addWidget(btn_filtrar)
+            
+            # Botón refrescar
+            btn_refrescar = QtWidgets.QPushButton("Refrescar")
+            btn_refrescar.setFixedSize(100, 30)
+            btn_refrescar.setStyleSheet("""
+                QPushButton {
+                    background-color: #27ae60;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #229954;
+                }
+            """)
+            filter_layout.addWidget(btn_refrescar)
+            
+            layout.addWidget(filter_frame)            # Tabla de scans
+            table = QtWidgets.QTableWidget()
+            table.setStyleSheet("""
+                QTableWidget {
+                    background-color: #1E1E1E;
+                    color: #ecf0f1;
+                    border: 1px solid #3C3940;
+                    gridline-color: #3C3940;
+                }
+                QTableWidget::item {
+                    padding: 8px;
+                }
+                QTableWidget::item:selected {
+                    background-color: #3498db;
+                }
+                QHeaderView::section {
+                    background-color: #2C2C2C;
+                    color: #3498db;
+                    font-weight: bold;
+                    padding: 8px;
+                    border: 1px solid #3C3940;
+                }
+            """)
+
+            # Columnas
+            table.setColumnCount(8)
+            table.setHorizontalHeaderLabels(["Status", "Tipo", "Código Completo", "NParte", "Línea", "Mensaje", "Hora", "Fecha"])
+            
+            # Label para contador
+            count_label = QtWidgets.QLabel("Cargando...")
+            count_label.setStyleSheet("color: #95a5a6; font-size: 11px;")
+            layout.addWidget(count_label)
+            
+            # Función para cargar datos
+            def load_data():
+                """Carga los datos de scans desde SQLite según filtros"""
+                try:
+                    from ..services.dual_db import get_dual_db
+                    dual_db = get_dual_db()
+                    
+                    # Obtener fechas del filtro
+                    fecha_desde_str = fecha_desde.date().toString("yyyy-MM-dd")
+                    fecha_hasta_str = fecha_hasta.date().toString("yyyy-MM-dd")
+                    tipo_filtro = tipo_combo.currentText()
+                    search_text = search_input.text().strip()
+                    
+                    with dual_db._get_sqlite_connection(timeout=3.0) as conn:
+                        # Construir query combinando scans exitosos y errores
+                        if tipo_filtro == "Solo OK":
+                            if search_text:
+                                query = """
+                                    SELECT raw, scan_format, nparte, linea, '' as error_msg, ts, 'OK' as status
+                                    FROM scans_local
+                                    WHERE DATE(ts) BETWEEN ? AND ?
+                                    AND raw LIKE ?
+                                    ORDER BY ts DESC
+                                    LIMIT 1000
+                                """
+                                params = (fecha_desde_str, fecha_hasta_str, f"%{search_text}%")
+                            else:
+                                query = """
+                                    SELECT raw, scan_format, nparte, linea, '' as error_msg, ts, 'OK' as status
+                                    FROM scans_local
+                                    WHERE DATE(ts) BETWEEN ? AND ?
+                                    ORDER BY ts DESC
+                                    LIMIT 1000
+                                """
+                                params = (fecha_desde_str, fecha_hasta_str)
+                        elif tipo_filtro == "Solo NG":
+                            if search_text:
+                                query = """
+                                    SELECT raw, scan_format, nparte, linea, error_message, ts, 'NG' as status
+                                    FROM scan_errors
+                                    WHERE DATE(fecha) BETWEEN ? AND ?
+                                    AND raw LIKE ?
+                                    ORDER BY ts DESC
+                                    LIMIT 1000
+                                """
+                                params = (fecha_desde_str, fecha_hasta_str, f"%{search_text}%")
+                            else:
+                                query = """
+                                    SELECT raw, scan_format, nparte, linea, error_message, ts, 'NG' as status
+                                    FROM scan_errors
+                                    WHERE DATE(fecha) BETWEEN ? AND ?
+                                    ORDER BY ts DESC
+                                    LIMIT 1000
+                                """
+                                params = (fecha_desde_str, fecha_hasta_str)
+                        else:  # Todos
+                            if search_text:
+                                query = """
+                                    SELECT raw, scan_format, nparte, linea, '' as error_msg, ts, 'OK' as status
+                                    FROM scans_local
+                                    WHERE DATE(ts) BETWEEN ? AND ?
+                                    AND raw LIKE ?
+                                    UNION ALL
+                                    SELECT raw, scan_format, nparte, linea, error_message, ts, 'NG' as status
+                                    FROM scan_errors
+                                    WHERE DATE(fecha) BETWEEN ? AND ?
+                                    AND raw LIKE ?
+                                    ORDER BY ts DESC
+                                    LIMIT 1000
+                                """
+                                params = (fecha_desde_str, fecha_hasta_str, f"%{search_text}%", 
+                                         fecha_desde_str, fecha_hasta_str, f"%{search_text}%")
+                            else:
+                                query = """
+                                    SELECT raw, scan_format, nparte, linea, '' as error_msg, ts, 'OK' as status
+                                    FROM scans_local
+                                    WHERE DATE(ts) BETWEEN ? AND ?
+                                    UNION ALL
+                                    SELECT raw, scan_format, nparte, linea, error_message, ts, 'NG' as status
+                                    FROM scan_errors
+                                    WHERE DATE(fecha) BETWEEN ? AND ?
+                                    ORDER BY ts DESC
+                                    LIMIT 1000
+                                """
+                                params = (fecha_desde_str, fecha_hasta_str, fecha_desde_str, fecha_hasta_str)
+                        
+                        cursor = conn.execute(query, params)
+                        scans = cursor.fetchall()
+                        
+                        # Actualizar contador
+                        count_label.setText(f"Total: {len(scans)} escaneos encontrados")
+                        
+                        # Llenar tabla
+                        table.setRowCount(len(scans))
+                        
+                        for i, row in enumerate(scans):
+                            raw, scan_format, nparte, linea, error_msg, ts, status = row
+                            
+                            # Status
+                            status_item = QtWidgets.QTableWidgetItem(status)
+                            if status == "OK":
+                                status_item.setForeground(QtGui.QColor("#27ae60"))
+                            else:
+                                status_item.setForeground(QtGui.QColor("#e74c3c"))
+                            status_item.setFont(QtGui.QFont("Arial", 10, QtGui.QFont.Weight.Bold))
+                            table.setItem(i, 0, status_item)
+                            
+                            # Tipo
+                            type_item = QtWidgets.QTableWidgetItem(scan_format or "N/A")
+                            type_item.setForeground(QtGui.QColor("#3498db" if scan_format == "QR" else "#95a5a6"))
+                            table.setItem(i, 1, type_item)
+                            
+                            # Código completo
+                            code_item = QtWidgets.QTableWidgetItem(raw or "")
+                            code_item.setFont(QtGui.QFont("Consolas", 9))
+                            table.setItem(i, 2, code_item)
+                            
+                            # NParte
+                            nparte_item = QtWidgets.QTableWidgetItem(nparte or "N/A")
+                            table.setItem(i, 3, nparte_item)
+                            
+                            # Línea
+                            linea_item = QtWidgets.QTableWidgetItem(linea or "N/A")
+                            table.setItem(i, 4, linea_item)
+                            
+                            # Mensaje (solo para errores)
+                            msg_item = QtWidgets.QTableWidgetItem(error_msg or "")
+                            if error_msg:
+                                msg_item.setForeground(QtGui.QColor("#e74c3c"))
+                            table.setItem(i, 5, msg_item)
+                            
+                            # Hora y Fecha
+                            try:
+                                dt = datetime.fromisoformat(ts)
+                                time_item = QtWidgets.QTableWidgetItem(dt.strftime("%H:%M:%S"))
+                                date_item = QtWidgets.QTableWidgetItem(dt.strftime("%Y-%m-%d"))
+                            except Exception:
+                                time_item = QtWidgets.QTableWidgetItem(ts or "")
+                                date_item = QtWidgets.QTableWidgetItem("")
+                            
+                            table.setItem(i, 6, time_item)
+                            table.setItem(i, 7, date_item)
+                        
+                        # Ajustar columnas
+                        table.setColumnWidth(0, 60)   # Status
+                        table.setColumnWidth(1, 80)   # Tipo
+                        table.setColumnWidth(2, 350)  # Código
+                        table.setColumnWidth(3, 100)  # NParte
+                        table.setColumnWidth(4, 80)   # Línea
+                        table.setColumnWidth(5, 200)  # Mensaje
+                        table.setColumnWidth(6, 80)   # Hora
+                        table.setColumnWidth(7, 100)  # Fecha
+                        
+                except Exception as e:
+                    logger.error(f"Error cargando historial: {e}")
+                    count_label.setText(f"Error: {e}")
+                    table.setRowCount(1)
+                    error_item = QtWidgets.QTableWidgetItem(f"Error cargando datos: {e}")
+                    error_item.setForeground(QtGui.QColor("#e74c3c"))
+                    table.setItem(0, 0, error_item)
+            
+            # Conectar botones
+            btn_filtrar.clicked.connect(load_data)
+            btn_refrescar.clicked.connect(load_data)
+            search_input.returnPressed.connect(load_data)  # Buscar al presionar Enter
+            
+            # Cargar datos iniciales
+            load_data()
+            
+            layout.addWidget(table)
+            
+            # Botón cerrar
+            btn_close = QtWidgets.QPushButton("Cerrar")
+            btn_close.setFixedSize(100, 35)
+            btn_close.setStyleSheet("""
+                QPushButton {
+                    background-color: #3498db;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #2980b9;
+                }
+            """)
+            btn_close.clicked.connect(dialog.close)
+            
+            btn_layout = QtWidgets.QHBoxLayout()
+            btn_layout.addStretch()
+            btn_layout.addWidget(btn_close)
+            layout.addLayout(btn_layout)
+            
+            dialog.exec()
+            
+        except Exception as e:
+            logger.error(f"Error mostrando historial completo: {e}")
+            QtWidgets.QMessageBox.warning(self, "Error", f"No se pudo abrir el historial: {e}")
+
     def _add_scan_to_history(self, raw: str, scan_type: str, success: bool, message: str = ""):
         """
         Agrega un scan al historial visual en formato LISTA (fila horizontal completa)
@@ -1022,7 +1443,44 @@ class MainWindow(QtWidgets.QMainWindow):
                 nparte = parsed.nparte
         except Exception:
             pass
-        
+
+        # Guardar errores en la base de datos
+        if not success:
+            try:
+                from ..services.dual_db import get_dual_db
+                from datetime import datetime
+                from zoneinfo import ZoneInfo
+
+                dual_db = get_dual_db()
+                now = datetime.now(ZoneInfo("America/Monterrey"))
+                ts = now.isoformat()
+                fecha = now.strftime("%Y-%m-%d")
+                
+                # Detectar código de error del mensaje
+                error_code = -1
+                if "QR+QR" in message or "DUPLICADO QR" in message:
+                    error_code = -8
+                elif "BC+BC" in message or "DUPLICADO BARCODE" in message:
+                    error_code = -9
+                elif "MODELO DIFERENTE" in message:
+                    error_code = -10
+                elif "SIN PLAN ACTIVO" in message:
+                    error_code = -11
+                
+                # Obtener línea actual
+                linea = self._selected_line if hasattr(self, '_selected_line') and self._selected_line else "N/A"
+                
+                with dual_db._get_sqlite_connection(timeout=2.0) as conn:
+                    conn.execute("""
+                        INSERT INTO scan_errors (raw, nparte, linea, scan_format, error_code, error_message, ts, fecha)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (raw, nparte if nparte != "N/A" else None, linea, scan_type, error_code, message, ts, fecha))
+                    conn.commit()
+                    
+                logger.debug(f"Error guardado en BD: {scan_type} - {message}")
+            except Exception as e:
+                logger.error(f"Error guardando error en BD: {e}")
+
         # Crear widget de scan en formato FILA (lista horizontal)
         scan_widget = QtWidgets.QFrame()
         scan_widget.setMinimumHeight(40)
@@ -1055,35 +1513,64 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QHBoxLayout(scan_widget)
         layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(12)
-        
-        # 1. Icono de estado + Tipo
-        status_label = QtWidgets.QLabel(f"{status_icon} {scan_type}")
+
+        # 1. Status OK/NG
+        status_text = "OK" if success else "NG"
+        status_color = "#27ae60" if success else "#e74c3c"
+        status_label = QtWidgets.QLabel(status_text)
         status_label.setStyleSheet(f"""
-            color: {border_color};
-            font-size: 11px;
+            color: {status_color};
+            font-size: 13px;
             font-weight: bold;
             background: transparent;
         """)
-        status_label.setFixedWidth(90)
+        status_label.setFixedWidth(35)
+        status_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(status_label)
-        
-        # 2. NParte
-        nparte_label = QtWidgets.QLabel(f"Parte: {nparte}")
-        nparte_label.setStyleSheet("""
-            color: #ecf0f1;
+
+        # 2. Tipo de scan
+        type_label = QtWidgets.QLabel(scan_type)
+        type_label.setStyleSheet(f"""
+            color: {border_color};
             font-size: 10px;
+            font-weight: bold;
             background: transparent;
         """)
-        nparte_label.setFixedWidth(180)
-        nparte_label.setToolTip(nparte)  # Tooltip con texto completo
+        type_label.setFixedWidth(70)
+        layout.addWidget(type_label)
+
+        # 3. Código completo (sin truncar, scrolleable)
+        code_label = QtWidgets.QLabel(raw)
+        code_label.setStyleSheet("""
+            color: #ecf0f1;
+            font-size: 9px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            background: transparent;
+        """)
+        code_label.setMinimumWidth(350)
+        code_label.setMaximumWidth(600)
+        code_label.setWordWrap(False)
+        code_label.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        code_label.setToolTip(f"Código completo (seleccionable): {raw}")
+        layout.addWidget(code_label)
+
+        # 4. NParte
+        nparte_label = QtWidgets.QLabel(f"Parte: {nparte}")
+        nparte_label.setStyleSheet("""
+            color: #95a5a6;
+            font-size: 9px;
+            background: transparent;
+        """)
+        nparte_label.setFixedWidth(120)
+        nparte_label.setToolTip(nparte)
         layout.addWidget(nparte_label)
-        
-        # 4. Mensaje (si hay error)
+
+        # 5. Mensaje (si hay)
         if message:
             msg_label = QtWidgets.QLabel(message)
             msg_label.setStyleSheet(f"""
                 color: {'#f39c12' if success else '#e74c3c'};
-                font-size: 10px;
+                font-size: 9px;
                 font-style: italic;
                 background: transparent;
             """)
@@ -1092,8 +1579,8 @@ class MainWindow(QtWidgets.QMainWindow):
             layout.addStretch(1)
         else:
             layout.addStretch(1)
-        
-        # 3. Timestamp (al final) - HORA LOCAL DE LA COMPUTADORA
+
+        # 6. Timestamp (al final)
         from zoneinfo import ZoneInfo
         now_local = datetime.now(ZoneInfo("America/Monterrey"))
         timestamp = now_local.strftime("%H:%M:%S")
@@ -1105,9 +1592,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """)
         time_label.setFixedWidth(60)
         time_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(time_label)
-        
-        # Agregar al historial (máximo 20, más reciente PRIMERO - arriba)
+        layout.addWidget(time_label)        # Agregar al historial (máximo 20, más reciente PRIMERO - arriba)
         self.scan_history.insert(0, scan_widget)  # Insertar al inicio
         if len(self.scan_history) > 20:
             # Eliminar el más antiguo (último de la lista)

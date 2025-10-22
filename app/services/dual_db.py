@@ -285,7 +285,24 @@ class DualDatabaseSystem:
                 conn.execute("ALTER TABLE scans_sin_plan ADD COLUMN scan_format TEXT")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sin_plan_linea ON scans_sin_plan(linea, nparte, aplicado)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sin_plan_aplicado ON scans_sin_plan(aplicado)")
-            
+
+            # Tabla de errores de escaneo
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS scan_errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                raw TEXT NOT NULL,
+                nparte TEXT,
+                linea TEXT NOT NULL,
+                scan_format TEXT,
+                error_code INTEGER NOT NULL,
+                error_message TEXT,
+                ts TEXT NOT NULL,
+                fecha TEXT NOT NULL
+            )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_scan_errors_fecha ON scan_errors(fecha)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_scan_errors_linea ON scan_errors(linea)")
+
             # Migración: agregar columnas si no existen
             try:
                 conn.execute("ALTER TABLE plan_local ADD COLUMN sequence INTEGER DEFAULT 0")

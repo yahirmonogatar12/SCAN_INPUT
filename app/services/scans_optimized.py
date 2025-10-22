@@ -50,10 +50,14 @@ def process_scan_direct(raw: str, linea: str = "M1") -> int:
             logger.warning(f"📋 Fuera de plan: {raw[:30]}...")
         elif scan_id == -4:
             logger.warning(f"⏸️ No está EN PROGRESO: {raw[:30]}...")
+        elif scan_id == -5:
+            logger.debug(f"⏳ Esperando par: {raw[:30]}...")  # NO es error, es estado normal
         elif scan_id == -7:
             logger.warning(f"🚫 SUB ASSY validation failed: {raw[:30]}...")
         elif scan_id == -8:
             logger.warning(f"🚫 QR duplicado rechazado: {raw[:30]}...")
+        elif scan_id == -9:
+            logger.warning(f"🚫 BARCODE duplicado rechazado: {raw[:30]}...")
         elif scan_id == -10:
             logger.warning(f"🚫 Modelo diferente al plan EN PROGRESO: {raw[:30]}...")
         else:
