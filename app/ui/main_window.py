@@ -1,4 +1,4 @@
-from PyQt6 import QtWidgets, QtCore, QtGui
+﻿from PyQt6 import QtWidgets, QtCore, QtGui
 from typing import List
 import os
 import logging
@@ -115,8 +115,8 @@ def normalize_scanner_text(text: str) -> str:
     # Convertir a MAYÚSCULAS primero
     normalized = text.upper()
     
-    # Mapeo de caracteres comunes que cambian entre distribución inglés/español
-    # NOTA: NO convertir Ñ porque es separador válido en QR formato nuevo
+    # Mapeo de caracteres comunes que cambian entre distribucií³n inglí©s/espaí±ol
+    # NOTA: NO convertir í‘ porque es separador válido en QR formato nuevo
     char_map = {
         # 'Ñ': 'N',  # ❌ DESHABILITADO - ñ es separador en QR nuevo
         'Ç': 'C',  # Ç -> C  
@@ -276,7 +276,7 @@ class MainWindow(QtWidgets.QMainWindow):
             for i, line in enumerate(allowed):
                 if line.strip().upper() == default_line:
                     self.linea_selector.setCurrentIndex(i)
-                    logger.info(f"✅ Línea predeterminada establecida: '{line}' (índice {i})")
+                    logger.info(f"… Lí­nea predeterminada establecida: '{line}' (í­ndice {i})")
                     self._linea_anterior = line
                     line_found = True
                     break
@@ -287,7 +287,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.linea_selector.setCurrentText(default_line)
                 self._linea_anterior = default_line
             
-            # 🔄 Notificar al cache de métricas sobre la línea inicial
+            # ðŸ”„ Notificar al cache de mí©tricas sobre la lí­nea inicial
             from app.services.metrics_cache import get_metrics_cache
             metrics_cache = get_metrics_cache()
             if metrics_cache:
@@ -309,7 +309,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 metrics_cache.set_active_line(default_opt)
                 logger.info(f"🎯 Cache de métricas configurado para línea fallback: '{default_opt}'")
         self.linea_selector.setObjectName("lineaSelector")
-        # Hacer el dropdown mucho más pequeño
+        # Hacer el dropdown mucho más pequeí±o
         self.linea_selector.setMaximumWidth(55)
         self.linea_selector.setMinimumWidth(50)
         self.linea_selector.setMaximumHeight(24)
@@ -329,7 +329,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_dual = QtWidgets.QLabel("Conectado")
         self.status_dual.setStyleSheet("color: #00aa00; font-size: 10px; font-weight: bold;")
         
-        # Botón de actualización manual
+        # Botí³n de actualizacií³n manual
         self.refresh_button = QtWidgets.QPushButton("Actualizar")
         self.refresh_button.setStyleSheet("""
             QPushButton {
@@ -351,7 +351,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.refresh_button.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
         self.refresh_button.clicked.connect(self._force_refresh)
         
-        # Botón para abrir ventana flotante de métricas
+        # Botí³n para abrir ventana flotante de mí©tricas
         self.float_metrics_button = QtWidgets.QPushButton("UPHS")
         self.float_metrics_button.setStyleSheet("""
             QPushButton {
@@ -373,7 +373,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.float_metrics_button.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
         self.float_metrics_button.clicked.connect(self._toggle_metrics_widget)
         
-        # Guardar referencias específicas para el modo pantalla completa
+        # Guardar referencias especí­ficas para el modo pantalla completa
         self.linea_label = linea_label
         
         # Variable para la ventana flotante
@@ -386,7 +386,7 @@ class MainWindow(QtWidgets.QMainWindow):
         linea_layout.addWidget(self.float_metrics_button)
         linea_layout.addStretch()
 
-        # Crear un widget contenedor para el layout de línea para poder ocultarlo fácilmente
+        # Crear un widget contenedor para el layout de lí­nea para poder ocultarlo fácilmente
         self.linea_container_widget = QtWidgets.QWidget()
         self.linea_container_widget.setLayout(linea_layout)
 
@@ -426,8 +426,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Ocultar tabla de escaneos individuales - solo mantener totales
         self.table_scans.setVisible(False)  # Oculta pero sigue existiendo en backend
         
-        # Tabla de plan ⚡ SIN UPH Real/Proy/CT (ya tenemos cards)
-        # Determinar número de columnas según modo SUB ASSY (ahora +1 por columna de Acciones)
+        # Tabla de plan  SIN UPH Real/Proy/CT (ya tenemos cards)
+        # Determinar níºmero de columnas segíºn modo SUB ASSY (ahora +1 por columna de Acciones)
         num_columns = 10 if (getattr(settings, 'SUB_ASSY_MODE', False) and 
                             getattr(settings, 'APP_MODE', 'ASSY').upper() == 'ASSY') else 9
         
@@ -438,7 +438,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """)
         self.table_plan.verticalHeader().setDefaultSectionSize(32)
         
-        # Headers dinámicos según modo SUB ASSY (con nueva columna Acciones) - ⚡ Sin UPH Real/Proy/CT
+        # Headers dinámicos segíºn modo SUB ASSY (con nueva columna Acciones) -  Sin UPH Real/Proy/CT
         if num_columns == 10:  # SUB ASSY
             self.table_plan.setHorizontalHeaderLabels(["Part No", "Lote", "Modelo", "SUB ASSY", "Plan", "Producido", "% Avance", "UPH Target", "Estado", "Acciones"])
         else:  # Normal (9 columnas)
@@ -451,7 +451,7 @@ class MainWindow(QtWidgets.QMainWindow):
         plan_header.resizeSection(1, 90)   # Lote
         plan_header.resizeSection(2, 100)  # Modelo
         
-        if num_columns == 10:  # Modo SUB ASSY con Acciones - ⚡ Sin UPH Real/Proy/CT
+        if num_columns == 10:  # Modo SUB ASSY con Acciones -  Sin UPH Real/Proy/CT
             plan_header.resizeSection(3, 80)   # SUB ASSY
             plan_header.resizeSection(4, 60)   # Plan
             plan_header.resizeSection(5, 70)   # Producido
@@ -459,7 +459,7 @@ class MainWindow(QtWidgets.QMainWindow):
             plan_header.resizeSection(7, 70)   # UPH Target
             plan_header.resizeSection(8, 80)   # Estado
             plan_header.resizeSection(9, 100)  # Acciones
-        else:  # Modo normal con Acciones (9 columnas) - ⚡ Sin UPH Real/Proy/CT
+        else:  # Modo normal con Acciones (9 columnas) -  Sin UPH Real/Proy/CT
             plan_header.resizeSection(3, 60)   # Plan
             plan_header.resizeSection(4, 70)   # Producido
             plan_header.resizeSection(5, 70)   # % Avance
@@ -468,58 +468,62 @@ class MainWindow(QtWidgets.QMainWindow):
             plan_header.resizeSection(8, 100)  # Acciones
 
         # Contenedor para totales y plan
-        # Contenedor principal con título
+        # Contenedor principal con tí­tulo
         main_container = QtWidgets.QWidget()
         main_layout = QtWidgets.QVBoxLayout(main_container)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # ⚡ TARJETAS DE TOTALES ARRIBA (antes del título)
+        #  TARJETAS DE TOTALES ARRIBA (antes del tí­tulo)
         self.plan_totals_widget = self._create_plan_totals_widget()
         main_layout.addWidget(self.plan_totals_widget)
         
-        self.title_plan = QtWidgets.QLabel("Plan de Producción (Línea Seleccionada)")
+        self.title_plan = QtWidgets.QLabel("Plan de Produccion (Lí­nea Seleccionada)")
         self.title_plan.setStyleSheet("font-weight: bold; margin-top:8px;")
         main_layout.addWidget(self.title_plan)
         
         # Tabla de plan (sin splitter, tarjetas ya están arriba)
         main_layout.addWidget(self.table_plan)
         
+        # ðŸ“œ HISTORIAL DE SCANS (QR y BARCODE)
+        self.scan_history_widget = self._create_scan_history_widget()
+        main_layout.addWidget(self.scan_history_widget)
+        
         layout.addWidget(main_container)
 
         # Status bar (oculto - info en tarjetas)
         self.status = self.statusBar()
-        self.status.hide()  # ⚡ Ocultamos la barra de abajo
+        self.status.hide()  #  Ocultamos la barra de abajo
 
-        # Menú
+        # Meníº
         menubar = self.menuBar()
         admin_menu = menubar.addMenu("Opciones")
         
-        # Opción para modo pantalla completa
+        # Opcií³n para modo pantalla completa
         self.action_fullscreen = admin_menu.addAction("Modo Pantalla Completa (F11)")
         self.action_fullscreen.triggered.connect(self.toggle_fullscreen_mode)
         
         admin_menu.addSeparator()
         
-        # Opción para configurar ubicación de DB local
+        # Opcií³n para configurar ubicacií³n de DB local
         self.action_db_config = admin_menu.addAction("Configurar DB Local")
         self.action_db_config.triggered.connect(self.configure_db_location)
         
         admin_menu.addSeparator()
         
-        # Opción de configuración general
-        self.action_configuracion = admin_menu.addAction("Configuración")
+        # Opcií³n de configuracií³n general
+        self.action_configuracion = admin_menu.addAction("Configuracií³n")
         self.action_configuracion.triggered.connect(self.open_configuracion)
 
         # Conexiones simplificadas
-        # ⚡ ESCANEO SIMPLIFICADO: Solo procesa con ENTER (escáner envía ENTER automáticamente)
+        #  ESCANEO SIMPLIFICADO: Solo procesa con ENTER (escáner enví­a ENTER automáticamente)
         # Eliminado reconocimiento automático de QR/BARCODE para evitar procesamiento innecesario
         self._processing_scan = False
         self._scan_in_progress = False  # Flag para pausar actualizaciones durante escaneo
-        self.scan_input.returnPressed.connect(self.handle_scan)  # ⚡ Solo ENTER
+        self.scan_input.returnPressed.connect(self.handle_scan)  #  Solo ENTER
         self._last_processed_code = ""  # Para evitar duplicados
         self._last_processed_time = 0
         
-        # Configuración por defecto - siempre modo rápido y auto-refresh
+        # Configuracií³n por defecto - siempre modo rápido y auto-refresh
         self._fast_scan_mode = True
         self._auto_refresh_active = True
 
@@ -531,21 +535,21 @@ class MainWindow(QtWidgets.QMainWindow):
         fullscreen_shortcut = QtGui.QShortcut(QtGui.QKeySequence("F11"), self)
         fullscreen_shortcut.activated.connect(self.toggle_fullscreen_mode)
 
-        # ✅ Timer automático para actualizaciones de CARDS (15 SEGUNDOS - SQLite instantáneo!)
+        # … Timer automático para actualizaciones de CARDS (15 SEGUNDOS - SQLite instantáneo!)
         # Ahora es SEGURO actualizar cada 5s porque SQLite local es < 1ms
-        # ⚡ Reducido a 5s para detectar cambios de plan más rápido (antes 15s)
+        #  Reducido a 5s para detectar cambios de plan más rápido (antes 15s)
         self.timer = QtCore.QTimer(self)
-        self.timer.setInterval(5_000)  # ✅ 5 SEGUNDOS (5,000 ms) - Lectura instantánea de SQLite
+        self.timer.setInterval(5_000)  # … 5 SEGUNDOS (5,000 ms) - Lectura instantánea de SQLite
         self.timer.timeout.connect(self._update_tables_and_status)
         self.timer.start()  # Siempre activo - sin bloqueos gracias a Dual DB
         
-        # ❌ DESHABILITADO - Timer de plan redundante (ahora _update_tables_and_status hace todo)
+        # âŒ DESHABILITADO - Timer de plan redundante (ahora _update_tables_and_status hace todo)
         # self.plan_timer = QtCore.QTimer(self)
         # self.plan_timer.setInterval(15_000)
         # self.plan_timer.timeout.connect(lambda: self.refresh_plan_only(force=False))
         # self.plan_timer.start()
 
-        # Cambio de línea actualiza plan (con validación de plan en progreso)
+        # Cambio de lí­nea actualiza plan (con validacií³n de plan en progreso)
         self.linea_selector.currentTextChanged.connect(self._on_linea_changed)
         
         # Timer para verificar estado del sistema dual
@@ -560,15 +564,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.inactivity_timer.timeout.connect(self._check_inactivity)
         self.inactivity_timer.start()
         
-        # Variable para rastrear el último escaneo por línea
+        # Variable para rastrear el íºltimo escaneo por lí­nea
         self._last_scan_time_per_line = {}  # {linea: timestamp}
         
-        # Caché para plan en progreso (evitar consultas constantes)
+        # Cachí© para plan en progreso (evitar consultas constantes)
         self._plan_en_progreso_cache = {}  # {linea: (plan_id, part_no, timestamp)}
 
-        # Menú Admin siempre visible (sin control de usuarios)
+        # Meníº Admin siempre visible (sin control de usuarios)
 
-        # Crear overlay de notificación para duplicados
+        # Crear overlay de notificacií³n para duplicados
         self._create_duplicate_overlay()
         # Crear overlay de OK
         self._create_ok_overlay()
@@ -585,7 +589,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._focus_timer.timeout.connect(self._ensure_scan_focus)
         self._focus_timer.start()
         
-        # Crear botón para salir del modo pantalla completa (inicialmente oculto)
+        # Crear botí³n para salir del modo pantalla completa (inicialmente oculto)
         self._create_exit_fullscreen_button()
 
     def showEvent(self, event):
@@ -594,7 +598,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Windows: Forzar icono en la barra de tareas usando Win32 API
         if hasattr(self, '_icon_set'):
-            return  # Ya se estableció
+            return  # Ya se establecií³
             
         try:
             import sys
@@ -621,16 +625,16 @@ class MainWindow(QtWidgets.QMainWindow):
                         None,
                         icon_path,
                         IMAGE_ICON,
-                        0, 0,  # tamaño (0 = usar tamaño predeterminado del icono)
+                        0, 0,  # tamaí±o (0 = usar tamaí±o predeterminado del icono)
                         LR_LOADFROMFILE | LR_DEFAULTSIZE
                     )
                     
-                    # Cargar icono pequeño (para título de ventana)
+                    # Cargar icono pequeí±o (para tí­tulo de ventana)
                     hicon_small = ctypes.windll.user32.LoadImageW(
                         None,
                         icon_path,
                         IMAGE_ICON,
-                        16, 16,  # tamaño pequeño
+                        16, 16,  # tamaí±o pequeí±o
                         LR_LOADFROMFILE
                     )
                     
@@ -639,10 +643,10 @@ class MainWindow(QtWidgets.QMainWindow):
                         ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
                     
                     if hicon_small:
-                        # Establecer icono pequeño (título de ventana)
+                        # Establecer icono pequeí±o (tí­tulo de ventana)
                         ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
                     
-                    logger.info("✅ Icono de barra de tareas establecido correctamente")
+                    logger.info("… Icono de barra de tareas establecido correctamente")
                     self._icon_set = True
                     
         except Exception as e:
@@ -651,7 +655,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _create_plan_totals_widget(self):
         """Crea tarjetas grandes de totales estilo control_bom.css"""
         widget = QtWidgets.QFrame()
-        widget.setMinimumHeight(140)  # ⚡ Altura mínima para que se vea
+        widget.setMinimumHeight(140)  #  Altura mí­nima para que se vea
         widget.setStyleSheet("""
             QFrame {
                 background-color: #34334E;
@@ -664,11 +668,11 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
         
-        # Tarjeta 1: Plan Total de la Línea
+        # Tarjeta 1: Plan Total de la Lí­nea
         self.card_plan = self._create_metric_card("Plan", "0", "#3498DB")
         layout.addWidget(self.card_plan)
         
-        # Tarjeta 2: Plan Acumulado (expectativa según tiempo transcurrido)
+        # Tarjeta 2: Plan Acumulado (expectativa segíºn tiempo transcurrido)
         self.card_resultado = self._create_metric_card("Plan Acumulado", "0", "#9B59B6")
         layout.addWidget(self.card_resultado)
         
@@ -688,7 +692,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.card_uphu = self._create_metric_card("UPPH", "0", "#E74C3C")
         layout.addWidget(self.card_uphu)
         
-        # ⚡ BARRA DE PROGRESO DE PRODUCCIÓN (estilo control_bom)
+        #  BARRA DE PROGRESO DE PRODUCCIí“N (estilo control_bom)
         progress_container = QtWidgets.QWidget()
         progress_container.setStyleSheet("background: transparent;")
         progress_layout = QtWidgets.QVBoxLayout(progress_container)
@@ -709,7 +713,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Barra de progreso
         self.general_progress_bar = QtWidgets.QProgressBar()
         self.general_progress_bar.setMinimum(0)
-        self.general_progress_bar.setMaximum(1000)  # x10 para mayor precisión
+        self.general_progress_bar.setMaximum(1000)  # x10 para mayor precisií³n
         self.general_progress_bar.setValue(0)
         self.general_progress_bar.setTextVisible(True)
         self.general_progress_bar.setFormat("%p%")
@@ -732,8 +736,8 @@ class MainWindow(QtWidgets.QMainWindow):
         """)
         progress_layout.addWidget(self.general_progress_bar)
         
-        # ⏱️ INDICADOR DE TIEMPO TRANSCURRIDO
-        self.tiempo_transcurrido_label = QtWidgets.QLabel("⏱️ Tiempo transcurrido: -- min")
+        # â±ï¸ INDICADOR DE TIEMPO TRANSCURRIDO
+        self.tiempo_transcurrido_label = QtWidgets.QLabel("Tiempo transcurrido: -- min")
         self.tiempo_transcurrido_label.setStyleSheet("""
             color: #95a5a6;
             font-size: 10px;
@@ -744,7 +748,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tiempo_transcurrido_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         progress_layout.addWidget(self.tiempo_transcurrido_label)
         
-        # 📅 INDICADOR VISUAL DE FECHA DEL PLAN (PROMINENTE)
+        # ðŸ“… INDICADOR VISUAL DE FECHA DEL PLAN (PROMINENTE)
         from datetime import date
         fecha_hoy = date.today().strftime("%d/%m/%Y")
         self.fecha_plan_label = QtWidgets.QLabel(f"PLAN DEL DÍA: {fecha_hoy}")
@@ -780,8 +784,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def _create_metric_card(self, title: str, value: str, color: str):
         """Crea una tarjeta estilo control_bom.css"""
         card = QtWidgets.QFrame()
-        card.setMinimumHeight(100)  # ⚡ Altura mínima visible
-        card.setMinimumWidth(120)   # ⚡ Ancho mínimo visible
+        card.setMinimumHeight(100)  #  Altura mí­nima visible
+        card.setMinimumWidth(120)   #  Ancho mí­nimo visible
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: #3C3940;
@@ -800,7 +804,7 @@ class MainWindow(QtWidgets.QMainWindow):
         card_layout.setSpacing(8)
         card_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         
-        # Título (arriba, pequeño, estilo control_bom)
+        # Tí­tulo (arriba, pequeí±o, estilo control_bom)
         title_label = QtWidgets.QLabel(title)
         title_label.setStyleSheet(f"""
             color: lightgray;
@@ -824,55 +828,301 @@ class MainWindow(QtWidgets.QMainWindow):
         value_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(value_label)
         
-        # Guardar referencia al label de valor para actualizar después
+        # Guardar referencia al label de valor para actualizar despuí©s
         card.value_label = value_label
         card.color = color
         
         return card
-        
-        # Barra de progreso general compacta
-        progress_container = QtWidgets.QVBoxLayout()
-        progress_container.setSpacing(4)
-        
-        progress_title = QtWidgets.QLabel("Progreso General de la Linea")
-        progress_title.setStyleSheet("font-size: 10px; color: #95a5a6; font-weight: 500;")
-        progress_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        progress_container.addWidget(progress_title)
-        
-        self.general_progress_bar = QtWidgets.QProgressBar()
-        self.general_progress_bar.setMinimum(0)
-        self.general_progress_bar.setMaximum(1000)  # Usar 1000 para mayor precisión
-        self.general_progress_bar.setValue(0)
-        self.general_progress_bar.setTextVisible(True)
-        self.general_progress_bar.setFormat("%p%")
-        self.general_progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid #20688C;
+    
+    def _create_scan_history_widget(self):
+        """Crea widget de historial de scans en formato LISTA VERTICAL con altura ajustable"""
+        # Contenedor principal
+        container = QtWidgets.QFrame()
+        container.setStyleSheet("""
+            QFrame {
+                background-color: #34334E;
+                border: 1px solid #20688C;
                 border-radius: 4px;
-                background-color: #34495e;
-                height: 28px;
-                text-align: center;
-                font-size: 13px;
+                padding: 8px;
+            }
+        """)
+        # Altura inicial ajustable (se puede cambiar con botones)
+        self._scan_history_height = 200  # Altura inicial en píxeles
+        container.setMinimumHeight(self._scan_history_height)
+        container.setMaximumHeight(self._scan_history_height)
+        
+        layout = QtWidgets.QVBoxLayout(container)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+        
+        # Header: Título + Botones de control de altura
+        header_layout = QtWidgets.QHBoxLayout()
+        header_layout.setSpacing(8)
+        
+        # Título
+        title = QtWidgets.QLabel(" Historial de Escaneos (Últimos 20)")
+        title.setStyleSheet("""
+            color: #3498db;
+            font-size: 12px;
+            font-weight: bold;
+            background: transparent;
+        """)
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch(1)
+        
+        # Botón: Reducir altura
+        btn_decrease = QtWidgets.QPushButton("")
+        btn_decrease.setFixedSize(30, 24)
+        btn_decrease.setToolTip("Reducir altura del historial")
+        btn_decrease.setStyleSheet("""
+            QPushButton {
+                background-color: #3C3940;
+                border: 1px solid #20688C;
+                border-radius: 4px;
+                color: #3498db;
                 font-weight: bold;
-                color: white;
+                font-size: 14px;
             }
-            QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #27ae60, stop:0.5 #2ecc71, stop:1 #3be682);
-                border-radius: 2px;
+            QPushButton:hover {
+                background-color: #45424A;
+                border-color: #3498db;
             }
-            QProgressBar::chunk[value="0"] {
+            QPushButton:pressed {
+                background-color: #2c3e50;
+            }
+        """)
+        btn_decrease.clicked.connect(lambda: self._adjust_scan_history_height(-50))
+        header_layout.addWidget(btn_decrease)
+        
+        # Etiqueta de altura actual
+        self.scan_history_height_label = QtWidgets.QLabel(f"{self._scan_history_height}px")
+        self.scan_history_height_label.setStyleSheet("""
+            color: #95a5a6;
+            font-size: 10px;
+            background: transparent;
+            padding: 0px 4px;
+        """)
+        self.scan_history_height_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.scan_history_height_label.setFixedWidth(50)
+        header_layout.addWidget(self.scan_history_height_label)
+        
+        # Botón: Aumentar altura
+        btn_increase = QtWidgets.QPushButton("")
+        btn_increase.setFixedSize(30, 24)
+        btn_increase.setToolTip("Aumentar altura del historial")
+        btn_increase.setStyleSheet("""
+            QPushButton {
+                background-color: #3C3940;
+                border: 1px solid #20688C;
+                border-radius: 4px;
+                color: #3498db;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #45424A;
+                border-color: #3498db;
+            }
+            QPushButton:pressed {
+                background-color: #2c3e50;
+            }
+        """)
+        btn_increase.clicked.connect(lambda: self._adjust_scan_history_height(50))
+        header_layout.addWidget(btn_increase)
+        
+        layout.addLayout(header_layout)
+        
+        # Área de scroll VERTICAL para mostrar scans en lista
+        scroll_area = QtWidgets.QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
                 background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: #2c3e50;
+                width: 10px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical {
+                background: #3498db;
+                border-radius: 5px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #5dade2;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
             }
         """)
         
-        progress_container.addWidget(self.general_progress_bar)
-        layout.addLayout(progress_container)
+        # Widget interno con layout VERTICAL para lista de scans
+        self.scan_history_container = QtWidgets.QWidget()
+        self.scan_history_layout = QtWidgets.QVBoxLayout(self.scan_history_container)
+        self.scan_history_layout.setContentsMargins(0, 0, 0, 0)
+        self.scan_history_layout.setSpacing(4)
+        self.scan_history_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         
-        return widget
+        # Mensaje inicial (sin scans)
+        self.scan_history_empty_label = QtWidgets.QLabel("Esperando escaneos...")
+        self.scan_history_empty_label.setStyleSheet("""
+            color: #95a5a6;
+            font-size: 11px;
+            font-style: italic;
+            background: transparent;
+            padding: 8px;
+        """)
+        self.scan_history_layout.addWidget(self.scan_history_empty_label)
+        
+        scroll_area.setWidget(self.scan_history_container)
+        layout.addWidget(scroll_area)
+        
+        # Lista para mantener historial de scans (máximo 20)
+        self.scan_history = []
+        
+        # Guardar referencia al contenedor para ajustar altura
+        self.scan_history_main_container = container
+        
+        return container
     
+    def _adjust_scan_history_height(self, delta: int):
+        """Ajusta la altura del historial de scans"""
+        # Límites: mínimo 100px, máximo 500px
+        new_height = max(100, min(500, self._scan_history_height + delta))
+        
+        if new_height != self._scan_history_height:
+            self._scan_history_height = new_height
+            self.scan_history_main_container.setMinimumHeight(new_height)
+            self.scan_history_main_container.setMaximumHeight(new_height)
+            self.scan_history_height_label.setText(f"{new_height}px")
+    
+    def _add_scan_to_history(self, raw: str, scan_type: str, success: bool, message: str = ""):
+        """
+        Agrega un scan al historial visual en formato LISTA (fila horizontal completa)
+        
+        Args:
+            raw: Código escaneado
+            scan_type: 'QR' o 'BARCODE'
+            success: True si fue exitoso, False si hubo error
+            message: Mensaje opcional de error
+        """
+        from datetime import datetime
+        
+        # Detectar nparte del scan
+        nparte = "N/A"
+        try:
+            from ..services.parser import parse_scan
+            parsed = parse_scan(raw)
+            if hasattr(parsed, 'nparte'):
+                nparte = parsed.nparte
+        except Exception:
+            pass
+        
+        # Crear widget de scan en formato FILA (lista horizontal)
+        scan_widget = QtWidgets.QFrame()
+        scan_widget.setMinimumHeight(40)
+        scan_widget.setMaximumHeight(40)
+        
+        # Color según resultado
+        if success:
+            border_color = "#27ae60" if scan_type == "QR" else "#3498db"
+            bg_color = "#2d5016" if scan_type == "QR" else "#1a4d6d"
+            status_icon = ""
+        else:
+            border_color = "#e74c3c"
+            bg_color = "#4d1a1a"
+            status_icon = ""
+        
+        scan_widget.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg_color};
+                border-left: 4px solid {border_color};
+                border-radius: 2px;
+                padding: 4px 8px;
+            }}
+            QFrame:hover {{
+                background-color: {bg_color}DD;
+                border-left: 4px solid {border_color}FF;
+            }}
+        """)
+        
+        # Layout HORIZONTAL para mostrar info en fila
+        layout = QtWidgets.QHBoxLayout(scan_widget)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(12)
+        
+        # 1. Icono de estado + Tipo
+        status_label = QtWidgets.QLabel(f"{status_icon} {scan_type}")
+        status_label.setStyleSheet(f"""
+            color: {border_color};
+            font-size: 11px;
+            font-weight: bold;
+            background: transparent;
+        """)
+        status_label.setFixedWidth(90)
+        layout.addWidget(status_label)
+        
+        # 2. NParte
+        nparte_label = QtWidgets.QLabel(f"Parte: {nparte}")
+        nparte_label.setStyleSheet("""
+            color: #ecf0f1;
+            font-size: 10px;
+            background: transparent;
+        """)
+        nparte_label.setFixedWidth(180)
+        nparte_label.setToolTip(nparte)  # Tooltip con texto completo
+        layout.addWidget(nparte_label)
+        
+        # 4. Mensaje (si hay error)
+        if message:
+            msg_label = QtWidgets.QLabel(message)
+            msg_label.setStyleSheet(f"""
+                color: {'#f39c12' if success else '#e74c3c'};
+                font-size: 10px;
+                font-style: italic;
+                background: transparent;
+            """)
+            msg_label.setWordWrap(False)
+            layout.addWidget(msg_label)
+            layout.addStretch(1)
+        else:
+            layout.addStretch(1)
+        
+        # 3. Timestamp (al final) - HORA LOCAL DE LA COMPUTADORA
+        from zoneinfo import ZoneInfo
+        now_local = datetime.now(ZoneInfo("America/Monterrey"))
+        timestamp = now_local.strftime("%H:%M:%S")
+        time_label = QtWidgets.QLabel(timestamp)
+        time_label.setStyleSheet("""
+            color: #7f8c8d;
+            font-size: 9px;
+            background: transparent;
+        """)
+        time_label.setFixedWidth(60)
+        time_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(time_label)
+        
+        # Agregar al historial (máximo 20, más reciente PRIMERO - arriba)
+        self.scan_history.insert(0, scan_widget)  # Insertar al inicio
+        if len(self.scan_history) > 20:
+            # Eliminar el más antiguo (último de la lista)
+            old_widget = self.scan_history.pop()
+            self.scan_history_layout.removeWidget(old_widget)
+            old_widget.deleteLater()
+        
+        # Ocultar mensaje "Esperando escaneos..." si existe
+        if hasattr(self, 'scan_history_empty_label') and self.scan_history_empty_label:
+            self.scan_history_empty_label.setVisible(False)
+        
+        # Insertar al INICIO del layout (arriba) para que más reciente aparezca primero
+        self.scan_history_layout.insertWidget(0, scan_widget)
     def _create_metric_label(self, title, value, value_color="#ecf0f1"):
-        """Crea un label de métrica con título y valor (compacto)"""
+        """Crea un label de mí©trica con tí­tulo y valor (compacto)"""
         container = QtWidgets.QWidget()
         container.setStyleSheet("background: transparent;")
         layout = QtWidgets.QVBoxLayout(container)
@@ -887,16 +1137,21 @@ class MainWindow(QtWidgets.QMainWindow):
         value_label = QtWidgets.QLabel(value)
         value_label.setStyleSheet(f"font-size: 32px; font-weight: bold; color: {value_color};")
         value_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        value_label.setObjectName(f"{title}_value")  # Para poder actualizar después
+        value_label.setObjectName(f"{title}_value")  # Para poder actualizar despuí©s
         layout.addWidget(value_label)
         
         return container
     
     def _update_cards_with_metrics(self, plan: int, plan_acum: int, produccion: int, 
-                                    eficiencia: float, uph: float, upph: float):
+                                    eficiencia: float, uph: float, upph: float,
+                                    M_trans_total: float = 0, M_tot_total: float = 0):
         """
-        Actualiza las cards con métricas calculadas
-        Método helper para evitar duplicación de código
+        Actualiza las cards con mí©tricas calculadas
+        Mí©todo helper para evitar duplicacií³n de cí³digo
+        
+        Args:
+            M_trans_total: Minutos transcurridos totales (opcional)
+            M_tot_total: Minutos totales efectivos (opcional)
         """
         try:
             # Actualizar tarjeta Plan Total
@@ -909,7 +1164,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.card_resultado.value_label.setText(f"{int(plan_acum)}")
                 self.card_resultado.value_label.repaint()
             
-            # Actualizar tarjeta Producción
+            # Actualizar tarjeta Produccií³n
             if hasattr(self.card_produccion, 'value_label') and self.card_produccion.value_label:
                 self.card_produccion.value_label.setText(f"{int(produccion)}")
                 self.card_produccion.value_label.repaint()
@@ -931,7 +1186,7 @@ class MainWindow(QtWidgets.QMainWindow):
             
             # Actualizar barra de progreso
             if hasattr(self, 'general_progress_bar') and self.general_progress_bar:
-                progress_value = int(eficiencia * 10)  # x10 para precisión
+                progress_value = int(eficiencia * 10)  # x10 para precisií³n
                 progress_value = max(0, min(1000, progress_value))  # Clamp 0-1000
                 self.general_progress_bar.setValue(progress_value)
                 self.general_progress_bar.repaint()
@@ -946,42 +1201,74 @@ class MainWindow(QtWidgets.QMainWindow):
             if hasattr(self, 'card_eficiencia'):
                 self.card_eficiencia.repaint()
             
-            logger.debug(f"✅ Cards actualizadas: Plan={plan}, Prod={produccion}, Efic={eficiencia:.1f}%")
+            # â±ï¸ Actualizar label de tiempo transcurrido
+            if hasattr(self, 'tiempo_transcurrido_label') and self.tiempo_transcurrido_label:
+                import datetime
+                from zoneinfo import ZoneInfo
+                monterrey_tz = ZoneInfo("America/Monterrey")
+                ahora = datetime.datetime.now(monterrey_tz)
+                
+                if M_tot_total > 0:
+                    porcentaje = (M_trans_total / M_tot_total) * 100
+                    tiempo_texto = f"📊 Tiempo transcurrido: {M_trans_total:.0f} / {M_tot_total:.0f} min ({porcentaje:.1f}%)"
+                    color = "#27ae60"  # Verde
+                else:
+                    tiempo_texto = f"📉 Hora actual: {ahora.strftime('%H:%M')}"
+                    color = "#95a5a6"  # Gris
+                
+                self.tiempo_transcurrido_label.setText(tiempo_texto)
+                self.tiempo_transcurrido_label.setStyleSheet(f"""
+                    color: {color};
+                    font-size: 10px;
+                    font-weight: 600;
+                    background: transparent;
+                    padding: 2px 0px;
+                """)
+                self.tiempo_transcurrido_label.repaint()
+            
+            logger.debug(f"… Cards actualizadas: Plan={plan}, Prod={produccion}, Efic={eficiencia:.1f}%")
             
         except Exception as e:
-            logger.error(f"❌ Error actualizando cards: {e}")
+            logger.error(f"âŒ Error actualizando cards: {e}")
     
     def _update_plan_totals(self, plan_rows):
-        """Actualiza las tarjetas con métricas de la línea
+        """Actualiza las tarjetas con mí©tricas de la lí­nea
         
-        � OPTIMIZACIÓN: Lee métricas desde caché SQLite (ultra-rápido, sin bloqueos)
-        El worker en background actualiza el caché cada 3 segundos desde MySQL
+        ï¿½ OPTIMIZACIí“N: Lee mí©tricas desde cachí© SQLite (ultra-rápido, sin bloqueos)
+        El worker en background actualiza el cachí© cada 3 segundos desde MySQL
         
-        �📐 FÓRMULAS CANÓNICAS (Single Source of Truth):
+        ï¿½ðŸ“ Fí“RMULAS CANí“NICAS (Single Source of Truth):
         
-        1. m_eff_total = Minutos efectivos del turno (duración - breaks del turno completo)
+        1. m_eff_total = Minutos efectivos del turno (duracií³n - breaks del turno completo)
         2. m_eff_trans = Minutos efectivos transcurridos (tiempo corrido - breaks ya ocurridos)
-        3. plan_acum = plan_total × (m_eff_trans / m_eff_total)
-        4. eficiencia = (prod_real / plan_acum) × 100  [si plan_acum > 0]
+        3. plan_acum = plan_total í— (m_eff_trans / m_eff_total)
+        4. eficiencia = (prod_real / plan_acum) í— 100  [si plan_acum > 0]
         
-        ⚠️ IMPORTANTE: UPH (última hora) NO interviene en eficiencia acumulada.
+        âš ï¸ IMPORTANTE: UPH (íºltima hora) NO interviene en eficiencia acumulada.
                       La eficiencia SOLO depende del tiempo efectivo transcurrido.
         
         Ejemplo (turno de 8h, 1 break de 30min):
         - m_eff_total = 480 - 30 = 450 min
         - A las 4h transcurridas con 15min de break: m_eff_trans = 240 - 15 = 225 min
         - plan_total = 1000 piezas
-        - plan_acum = 1000 × (225/450) = 500 piezas
+        - plan_acum = 1000 í— (225/450) = 500 piezas
         - prod_real = 520 piezas
-        - eficiencia = (520 / 500) × 100 = 104%
+        - eficiencia = (520 / 500) í— 100 = 104%
         """
         try:
             # Verificar que las tarjetas existan
             if not hasattr(self, 'card_plan') or not self.card_plan:
                 return
             
-            # ✅ LEER DIRECTAMENTE DE SQLITE (SIN CACHÉ - DATOS SIEMPRE FRESCOS)
+            # … LEER DIRECTAMENTE DE SQLITE (SIN CACHí‰ - DATOS SIEMPRE FRESCOS)
             from ..services.dual_db import get_dual_db
+            import datetime
+            from zoneinfo import ZoneInfo
+            
+            # Calcular fecha/hora actual al inicio
+            monterrey_tz = ZoneInfo("America/Monterrey")
+            ahora = datetime.datetime.now(monterrey_tz)
+            today = ahora.date().isoformat()
             
             dual_db = get_dual_db()
             linea_seleccionada = self.linea_selector.currentText() if hasattr(self, 'linea_selector') else ''
@@ -990,7 +1277,7 @@ class MainWindow(QtWidgets.QMainWindow):
             with dual_db._get_sqlite_connection(timeout=1.0) as conn:
                 cursor = conn.cursor()
                 
-                # Plan total y producción total
+                # Plan total (TODOS los dí­as - para referencia)
                 cursor.execute("""
                     SELECT SUM(plan_count), SUM(produced_count)
                     FROM plan_local
@@ -998,29 +1285,134 @@ class MainWindow(QtWidgets.QMainWindow):
                 """, (linea_seleccionada,))
                 
                 result = cursor.fetchone()
-                plan_total = result[0] or 0
-                produccion_total = result[1] or 0
+                plan_total_todos = result[0] or 0
+                produccion_total_todos = result[1] or 0
+                
+                # Plan del dí­a actual (para Plan Acumulado y tiempo transcurrido)
+                # Filtrar por working_date en lugar de planned_start
+                cursor.execute("""
+                    SELECT SUM(plan_count), SUM(produced_count)
+                    FROM plan_local
+                    WHERE line = ?
+                    AND working_date = ?
+                """, (linea_seleccionada, today))
+                
+                result_hoy = cursor.fetchone()
+                plan_total = result_hoy[0] or 0
+                produccion_total = result_hoy[1] or 0
+                
+                # â±ï¸ Obtener datos de planes para calcular tiempo transcurrido
+                # Solo considerar planes del dí­a actual para el tiempo transcurrido
+                cursor.execute("""
+                    SELECT planned_start, planned_end, effective_minutes
+                    FROM plan_local
+                    WHERE line = ?
+                    AND working_date = ?
+                """, (linea_seleccionada, today))
+                
+                plan_rows_time = cursor.fetchall()
             
-            # Calcular eficiencia simple
-            if plan_total > 0:
-                eficiencia = (produccion_total / plan_total) * 100
+            # â±ï¸ CALCULAR TIEMPO TRANSCURRIDO
+            
+            M_trans_total = 0
+            M_tot_total = 0
+            
+            BREAKS = [
+                (9, 30, 15),   # 09:30-09:45
+                (12, 0, 30),   # 12:00-12:30 (comida)
+                (15, 0, 15),   # 15:00-15:15
+            ]
+            
+            for row in plan_rows_time:
+                planned_start = row[0]
+                planned_end = row[1]
+                effective_minutes = row[2] or 0
+                
+                # Calcular M_trans y M_tot para este plan
+                if not planned_start or not planned_end or planned_start == 'N/A' or planned_end == 'N/A':
+                    # Sin fechas, asumir 50% del tiempo
+                    M_tot = effective_minutes
+                    M_trans = M_tot // 2
+                else:
+                    try:
+                        if isinstance(planned_start, str):
+                            planned_start = datetime.datetime.fromisoformat(planned_start).replace(tzinfo=monterrey_tz)
+                        if isinstance(planned_end, str):
+                            planned_end = datetime.datetime.fromisoformat(planned_end).replace(tzinfo=monterrey_tz)
+                        
+                        ahora_dt = ahora
+                        M_tot = effective_minutes
+                        
+                        # Si no ha empezado
+                        if ahora_dt < planned_start:
+                            M_trans = 0
+                        # Si ya terminí³
+                        elif ahora_dt >= planned_end:
+                            M_trans = M_tot
+                        # Durante el plan
+                        else:
+                            # Calcular minutos transcurridos
+                            t_ini = planned_start
+                            t_fin = min(ahora_dt, planned_end)
+                            m_raw = max(0, int((t_fin - t_ini).total_seconds() / 60))
+                            
+                            # Deducir breaks
+                            m_brk = 0
+                            for hora_break, minuto_break, duracion_break in BREAKS:
+                                inicio_break = t_ini.replace(hour=hora_break, minute=minuto_break, second=0, microsecond=0)
+                                fin_break = inicio_break + datetime.timedelta(minutes=duracion_break)
+                                
+                                overlap_start = max(inicio_break, t_ini)
+                                overlap_end = min(fin_break, t_fin)
+                                
+                                if overlap_start < overlap_end:
+                                    overlap_minutos = int((overlap_end - overlap_start).total_seconds() / 60)
+                                    m_brk += overlap_minutos
+                            
+                            M_trans = min(max(0, m_raw - m_brk), M_tot)
+                    except Exception as e:
+                        logger.error(f"Error calculando tiempo: {e}")
+                        M_tot = effective_minutes
+                        M_trans = M_tot // 2
+                
+                M_trans_total += M_trans
+                M_tot_total += M_tot
+            
+            # ðŸ“Š CALCULAR PLAN ACUMULADO basado en tiempo transcurrido
+            if M_tot_total > 0:
+                fraccion_transcurrida = M_trans_total / M_tot_total
+                plan_acumulado = round(plan_total * fraccion_transcurrida)
             else:
+                # Si no hay tiempo configurado, usar el plan total
+                plan_acumulado = plan_total
+            
+            # ðŸŽ¯ CALCULAR EFICIENCIA BASADA EN PLAN ACUMULADO (tiempo transcurrido)
+            # Eficiencia = (Produccií³n Real / Plan Acumulado) í— 100
+            # - 100% = Van al ritmo esperado
+            # - >100% = Van adelantados
+            # - <100% = Van atrasados
+            if plan_acumulado > 0:
+                eficiencia = (produccion_total / plan_acumulado) * 100
+            else:
+                # Si el plan no ha empezado (plan_acumulado = 0), no hay eficiencia aíºn
                 eficiencia = 0.0
             
-            # Actualizar cards con datos reales de SQLite
+            # Actualizar cards con datos reales de SQLite (incluyendo tiempo)
             self._update_cards_with_metrics(
                 plan=plan_total,
-                plan_acum=plan_total,
+                plan_acum=plan_acumulado,
                 produccion=produccion_total,
                 eficiencia=eficiencia,
                 uph=0,
-                upph=0.0
+                upph=0.0,
+                M_trans_total=M_trans_total,
+                M_tot_total=M_tot_total
             )
             
-            logger.debug(f"✅ _update_plan_totals desde SQLite: Plan={plan_total}, Prod={produccion_total}, Efic={eficiencia:.1f}%")
+            logger.debug(f"… _update_plan_totals desde SQLite: Plan={plan_total}, Prod={produccion_total}, Efic={eficiencia:.1f}%")
             return
             
-            # ===== CÓDIGO VIEJO DEL CACHÉ (DESHABILITADO) =====
+            # ===== Cí“DIGO VIEJO DEL CACHí‰ (DESHABILITADO) =====
             from ..services.metrics_cache import get_metrics_cache
             from datetime import date
             
@@ -1032,10 +1424,14 @@ class MainWindow(QtWidgets.QMainWindow):
             if metrics_cache:
                 cached_metrics = metrics_cache.get_metrics_from_cache(linea_seleccionada, fecha_hoy)
             
-            # Si hay métricas en caché, usarlas (ultra-rápido)
+            # Si hay mí©tricas en cachí©, usarlas (ultra-rápido)
             if cached_metrics:
-                logger.debug(f"⚡ Usando métricas desde caché para {linea_seleccionada}")
-                
+                print(f"\n{'='*80}")
+                print(f"📊 USANDO CACHÉ - Calculando tiempo transcurrido...")
+                print(f"{'='*80}\n")
+
+                logger.debug(f" Usando métricas desde cache para {linea_seleccionada}")
+
                 plan = cached_metrics['plan_total']
                 plan_acumulado = cached_metrics['plan_acumulado']
                 produccion_acumulada = cached_metrics['produccion_real']
@@ -1049,12 +1445,117 @@ class MainWindow(QtWidgets.QMainWindow):
                     eficiencia, uph, upph
                 )
                 
-                logger.debug(f"✅ Cards actualizadas desde caché: Eficiencia={eficiencia:.1f}%")
+                # â±ï¸ CALCULAR TIEMPO TRANSCURRIDO (incluso con cachí©)
+                import datetime
+                from zoneinfo import ZoneInfo
+                monterrey_tz = ZoneInfo("America/Monterrey")
+                ahora = datetime.datetime.now(monterrey_tz)
+                
+                # Obtener M_trans_total y M_tot_total de los planes
+                M_trans_total = 0
+                M_tot_total = 0
+                
+                if plan_rows:
+                    BREAKS = [
+                        (9, 30, 15),   # 09:30-09:45
+                        (12, 0, 30),   # 12:00-12:30 (comida)
+                        (15, 0, 15),   # 15:00-15:15
+                    ]
+                    
+                    for plan_dict in plan_rows:
+                        planned_start = plan_dict.get('planned_start')
+                        planned_end = plan_dict.get('planned_end')
+                        effective_minutes = plan_dict.get('effective_minutes', 0)
+                        
+                        # Calcular M_trans y M_tot para este plan (versií³n simplificada)
+                        if not planned_start or not planned_end or planned_start == 'N/A' or planned_end == 'N/A':
+                            # Sin fechas, asumir 50% del tiempo
+                            M_tot = effective_minutes or 0
+                            M_trans = M_tot // 2
+                        else:
+                            try:
+                                if isinstance(planned_start, str):
+                                    planned_start = datetime.datetime.fromisoformat(planned_start).replace(tzinfo=monterrey_tz)
+                                if isinstance(planned_end, str):
+                                    planned_end = datetime.datetime.fromisoformat(planned_end).replace(tzinfo=monterrey_tz)
+                                
+                                ahora_dt = ahora
+                                
+                                # Calcular M_tot (minutos efectivos totales con breaks deducidos)
+                                M_tot = effective_minutes or 0
+                                
+                                # Si no ha empezado
+                                if ahora_dt < planned_start:
+                                    M_trans = 0
+                                # Si ya terminí³
+                                elif ahora_dt >= planned_end:
+                                    M_trans = M_tot
+                                # Durante el plan
+                                else:
+                                    # Calcular minutos transcurridos desde planned_start
+                                    t_ini = planned_start
+                                    t_fin = min(ahora_dt, planned_end)
+                                    m_raw = max(0, int((t_fin - t_ini).total_seconds() / 60))
+                                    
+                                    # Deducir breaks
+                                    m_brk = 0
+                                    for hora_break, minuto_break, duracion_break in BREAKS:
+                                        inicio_break = t_ini.replace(hour=hora_break, minute=minuto_break, second=0, microsecond=0)
+                                        fin_break = inicio_break + datetime.timedelta(minutes=duracion_break)
+                                        
+                                        overlap_start = max(inicio_break, t_ini)
+                                        overlap_end = min(fin_break, t_fin)
+                                        
+                                        if overlap_start < overlap_end:
+                                            overlap_minutos = int((overlap_end - overlap_start).total_seconds() / 60)
+                                            m_brk += overlap_minutos
+                                    
+                                    M_trans = min(max(0, m_raw - m_brk), M_tot)
+                            except Exception as e:
+                                logger.error(f"Error calculando tiempo: {e}")
+                                M_tot = effective_minutes or 0
+                                M_trans = M_tot // 2
+                        
+                        M_trans_total += M_trans
+                        M_tot_total += M_tot
+                
+                print(f"\n{'â±ï¸'*40}")
+                print(f"RESULTADO CíLCULO TIEMPO (CACHí‰):")
+                print(f"  M_trans_total = {M_trans_total}")
+                print(f"  M_tot_total = {M_tot_total}")
+                print(f"  plan_rows count = {len(plan_rows) if plan_rows else 0}")
+                print(f"{'â±ï¸'*40}\n")
+                
+                # Actualizar label de tiempo transcurrido
+                if hasattr(self, 'tiempo_transcurrido_label') and self.tiempo_transcurrido_label:
+                    print(f"  … Label existe, actualizando...")
+                    if M_tot_total > 0:
+                        porcentaje = (M_trans_total / M_tot_total) * 100
+                        tiempo_texto = f"✓ Tiempo transcurrido: {M_trans_total:.0f} / {M_tot_total:.0f} min ({porcentaje:.1f}%)"
+                        color = "#27ae60"  # Verde
+                        print(f"  📊 Texto: {tiempo_texto}")
+                    else:
+                        tiempo_texto = f"✓ Hora actual: {ahora.strftime('%H:%M')}"
+                        color = "#95a5a6"  # Gris
+                        print(f"  📉 M_tot_total=0, mostrando hora: {tiempo_texto}")
+
+                    self.tiempo_transcurrido_label.setText(tiempo_texto)
+                    self.tiempo_transcurrido_label.setStyleSheet(f"""
+                        color: {color};
+                        font-size: 10px;
+                        font-weight: 600;
+                        background: transparent;
+                        padding: 2px 0px;
+                    """)
+                else:
+                    print(f"  📉 Label NO existe o no está disponible")
+
+                logger.debug(f"… Cards actualizadas desde cache: Eficiencia={eficiencia:.1f}%")
                 return
-            
-            # Si no hay caché, calcular métricas tradicional (fallback)
-            logger.debug(f"⚠️ Sin caché, calculando métricas tradicional")
-            
+
+            # Si no hay cache, calcular métricas tradicional (fallback)
+            logger.debug(f"📉 Sin cache, calculando métricas tradicional")
+
             # ========== IMPORTS Y CONSTANTES (SIEMPRE) ==========
             import datetime
             from zoneinfo import ZoneInfo
@@ -1062,27 +1563,31 @@ class MainWindow(QtWidgets.QMainWindow):
             monterrey_tz = ZoneInfo("America/Monterrey")
             ahora = datetime.datetime.now(monterrey_tz)
             
+            # Variables para tiempo transcurrido (inicializar aquí­ para que estí©n en scope)
+            M_trans_total = 0
+            M_tot_total = 0
+            
             # Si no hay planes, mostrar ceros y mensaje
             if not plan_rows:
                 plan = resultado = produccion_acumulada = eficiencia = uph = upph = 0
-                logger.info("📋 Sin plan cargado - mostrando valores en cero")
+                logger.info("ðŸ“‹ Sin plan cargado - mostrando valores en cero")
             else:
-                # ========== BREAKS ESTÁNDAR ==========
-                # Breaks estándar (hora, minuto, duración_minutos)
+                # ========== BREAKS ESTíNDAR ==========
+                # Breaks estándar (hora, minuto, duracií³n_minutos)
                 BREAKS = [
                     (9, 30, 15),   # 09:30-09:45
                     (12, 0, 30),   # 12:00-12:30 (comida)
                     (15, 0, 15),   # 15:00-15:15
                 ]
                 
-                # ========== CALCULAR PLAN TOTAL DE LA LÍNEA ==========
+                # ========== CALCULAR PLAN TOTAL DE LA LíNEA ==========
                 plan_total_linea = sum(r.get('plan_count', 0) or 0 for r in plan_rows)
-                logger.info(f"🔍 DEBUG: Número de planes en línea: {len(plan_rows)}")
+                logger.info(f"ðŸ” DEBUG: Níºmero de planes en lí­nea: {len(plan_rows)}")
                 for idx, r in enumerate(plan_rows, 1):
                     logger.info(f"   Plan {idx}: part_no={r.get('part_no')}, plan_count={r.get('plan_count')}, produced={r.get('produced_count')}, status={r.get('status')}")
-                logger.info(f"🔍 DEBUG: Plan total línea (suma de plan_count): {plan_total_linea}")
+                logger.info(f"ðŸ” DEBUG: Plan total lí­nea (suma de plan_count): {plan_total_linea}")
                 
-                # ========== FUNCIÓN: CALCULAR MINUTOS EFECTIVOS ==========
+                # ========== FUNCIí“N: CALCULAR MINUTOS EFECTIVOS ==========
                 def calcular_minutos_efectivos_plan(plan_dict, ahora_dt):
                     """
                     Retorna (m_eff_trans, m_eff_total) para un plan.
@@ -1090,9 +1595,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     m_eff_trans = minutos efectivos transcurridos (con breaks descontados)
                     m_eff_total = minutos efectivos totales del plan (con breaks descontados)
                     
-                    Lógica:
+                    Lí³gica:
                     1. Obtener M_tot de effective_minutes (o calcular desde fechas, o default 450min)
-                    2. Si no hay fechas → asumir 50% transcurrido
+                    2. Si no hay fechas â†’ asumir 50% transcurrido
                     3. Si hay fechas:
                        - t_ini = planned_start
                        - t_fin = min(ahora, planned_end)
@@ -1117,21 +1622,21 @@ class MainWindow(QtWidgets.QMainWindow):
                             
                             # Calcular diferencia total (asumiendo que effective_minutes = tiempo total)
                             M_tot = int((planned_end - planned_start).total_seconds() / 60)
-                            logger.debug(f"📊 Plan {plan_dict.get('part_no')}: calculado M_tot={M_tot} min desde fechas")
+                            logger.debug(f"ðŸ“Š Plan {plan_dict.get('part_no')}: calculado M_tot={M_tot} min desde fechas")
                         except Exception as e:
-                            logger.warning(f"⚠️ Error calculando M_tot desde fechas para {plan_dict.get('part_no')}: {e}")
+                            logger.warning(f"âš ï¸ Error calculando M_tot desde fechas para {plan_dict.get('part_no')}: {e}")
                             M_tot = 0
                     
-                    # FALLBACK 2: Si AÚN no hay M_tot, usar valor por defecto (450 min = 7.5h)
+                    # FALLBACK 2: Si AíšN no hay M_tot, usar valor por defecto (450 min = 7.5h)
                     if M_tot == 0:
                         M_tot = 450  # Valor por defecto: 7.5 horas efectivas
-                        logger.debug(f"📊 Plan {plan_dict.get('part_no')}: usando M_tot por defecto={M_tot} min")
+                        logger.debug(f"ðŸ“Š Plan {plan_dict.get('part_no')}: usando M_tot por defecto={M_tot} min")
                     
                     # Si no hay fechas de plan, asumir que estamos a mitad del tiempo
                     if not planned_start_str or not planned_end_str:
                         # Sin fechas, asumir que estamos al 50% del tiempo
                         M_trans = M_tot // 2
-                        logger.debug(f"📊 Plan {plan_dict.get('part_no')}: sin fechas, asumiendo 50% transcurrido (M_trans={M_trans})")
+                        logger.debug(f"ðŸ“Š Plan {plan_dict.get('part_no')}: sin fechas, asumiendo 50% transcurrido (M_trans={M_trans})")
                         return (M_trans, M_tot)
                     
                     try:
@@ -1147,11 +1652,11 @@ class MainWindow(QtWidgets.QMainWindow):
                         t_ini = planned_start
                         t_fin = min(ahora_dt, planned_end)
                         
-                        # Si aún no ha empezado el plan, M_trans = 0
+                        # Si aíºn no ha empezado el plan, M_trans = 0
                         if ahora_dt < planned_start:
                             return (0, M_tot)
                         
-                        # Si ya terminó el plan, M_trans = M_tot
+                        # Si ya terminí³ el plan, M_trans = M_tot
                         if ahora_dt >= planned_end:
                             return (M_tot, M_tot)
                         
@@ -1162,7 +1667,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         m_brk = 0
                         
                         for hora_break, minuto_break, duracion_break in BREAKS:
-                            # Crear datetime del break usando el mismo día que t_ini
+                            # Crear datetime del break usando el mismo dí­a que t_ini
                             inicio_break = t_ini.replace(hour=hora_break, minute=minuto_break, second=0, microsecond=0)
                             fin_break = inicio_break + datetime.timedelta(minutes=duracion_break)
                             
@@ -1174,24 +1679,24 @@ class MainWindow(QtWidgets.QMainWindow):
                                 # Hay overlap
                                 overlap_minutos = int((overlap_end - overlap_start).total_seconds() / 60)
                                 m_brk += overlap_minutos
-                                logger.debug(f"🚫 Break {hora_break:02d}:{minuto_break:02d} overlap: {overlap_minutos} min")
+                                logger.debug(f"ðŸš« Break {hora_break:02d}:{minuto_break:02d} overlap: {overlap_minutos} min")
                         
                         # ========== CALCULAR m_eff_trans (minutos efectivos transcurridos) ==========
                         m_eff_trans = min(max(0, m_raw - m_brk), M_tot)
                         
-                        logger.debug(f"📊 Plan {plan_dict.get('part_no')}: m_raw={m_raw}, m_brk={m_brk}, m_eff_trans={m_eff_trans}, M_tot={M_tot}")
+                        logger.debug(f"ðŸ“Š Plan {plan_dict.get('part_no')}: m_raw={m_raw}, m_brk={m_brk}, m_eff_trans={m_eff_trans}, M_tot={M_tot}")
                         
                         return (m_eff_trans, M_tot)
                         
                     except Exception as e:
-                        logger.error(f"❌ Error calculando M_trans para plan {plan_dict.get('part_no')}: {e}")
+                        logger.error(f"âŒ Error calculando M_trans para plan {plan_dict.get('part_no')}: {e}")
                         # En caso de error, asumir 50% transcurrido
                         return (M_tot // 2, M_tot)
                 
-                # ========== FUNCIÓN AUXILIAR: CALCULAR PLAN ACUMULADO POR PLAN ==========
+                # ========== FUNCIí“N AUXILIAR: CALCULAR PLAN ACUMULADO POR PLAN ==========
                 def calcular_plan_acumulado_plan(plan_dict, M_trans, M_tot):
                     """
-                    Calcula plan_acum_plan = round(plan_count × (M_trans / M_tot))
+                    Calcula plan_acum_plan = round(plan_count í— (M_trans / M_tot))
                     
                     Args:
                         plan_dict: Diccionario con datos del plan (plan_count)
@@ -1199,28 +1704,28 @@ class MainWindow(QtWidgets.QMainWindow):
                         M_tot: Minutos efectivos totales
                     
                     Returns:
-                        int: Plan acumulado para este plan específico
+                        int: Plan acumulado para este plan especí­fico
                     """
                     plan_count = plan_dict.get('plan_count', 0) or 0
                     
                     if M_tot == 0 or plan_count == 0:
                         return 0
                     
-                    # f = M_trans / M_tot (fracción de avance del tiempo)
+                    # f = M_trans / M_tot (fraccií³n de avance del tiempo)
                     f = M_trans / M_tot
                     
-                    # plan_acum_plan = round(plan_count × f)
+                    # plan_acum_plan = round(plan_count í— f)
                     plan_acum_plan = round(plan_count * f)
                     
                     return plan_acum_plan
                 
-                # ========== FUNCIÓN AUXILIAR: CALCULAR EFICIENCIA POR PLAN ==========
+                # ========== FUNCIí“N AUXILIAR: CALCULAR EFICIENCIA POR PLAN ==========
                 def calcular_eficiencia_plan(produced_count, plan_acum_plan):
                     """
-                    Calcula Efic% = (produced_count / plan_acum_plan) × 100
+                    Calcula Efic% = (produced_count / plan_acum_plan) í— 100
                     
                     Args:
-                        produced_count: Producción real del plan
+                        produced_count: Produccií³n real del plan
                         plan_acum_plan: Plan acumulado del plan
                     
                     Returns:
@@ -1232,63 +1737,87 @@ class MainWindow(QtWidgets.QMainWindow):
                     eficiencia = (produced_count / plan_acum_plan) * 100
                     return eficiencia
                 
-                # ========== NUEVAS FÓRMULAS BASADAS EN PLAN_MAIN ==========
-                # Ahora trabajamos con cada plan individual y luego sumamos a nivel línea
+                # ========== NUEVAS Fí“RMULAS BASADAS EN PLAN_MAIN ==========
+                # Ahora trabajamos con cada plan individual y luego sumamos a nivel lí­nea
                 
-                logger.info(f"⏱️ Hora actual: {ahora.strftime('%H:%M:%S')}")
+                logger.info(f"â±ï¸ Hora actual: {ahora.strftime('%H:%M:%S')}")
                 
-                # Variables acumuladas a nivel línea
+                # Variables acumuladas a nivel lí­nea
                 Plan_acum_linea = 0
                 Prod_acum_linea = 0
+                # M_trans_total y M_tot_total ya están inicializadas arriba
                 
-                # Procesar TODOS los planes de la línea (no solo el "en progreso")
+                # Procesar TODOS los planes de la lí­nea (no solo el "en progreso")
                 for plan_dict in plan_rows:
                     part_no = plan_dict.get('part_no', '')
                     plan_count = plan_dict.get('plan_count', 0) or 0
                     produced_count = plan_dict.get('produced_count', 0) or 0
+                    planned_start = plan_dict.get('planned_start', 'N/A')
+                    planned_end = plan_dict.get('planned_end', 'N/A')
+                    effective_minutes = plan_dict.get('effective_minutes', 0)
                     
                     # Calcular M_trans y M_tot para este plan
                     M_trans, M_tot = calcular_minutos_efectivos_plan(plan_dict, ahora)
                     
+                    # Acumular tiempos para mostrar en el label
+                    M_trans_total += M_trans
+                    M_tot_total += M_tot
+                    
                     # Calcular plan_acum_plan para este plan
                     plan_acum_plan = calcular_plan_acumulado_plan(plan_dict, M_trans, M_tot)
                     
-                    # Acumular a nivel línea
+                    # Acumular a nivel lí­nea
                     Plan_acum_linea += plan_acum_plan
                     Prod_acum_linea += produced_count
                     
-                    logger.info(f"🔍 Plan '{part_no}': plan_count={plan_count}, M_trans={M_trans}min, M_tot={M_tot}min, plan_acum={plan_acum_plan}, produced={produced_count}, status={plan_dict.get('status')}")
+                    logger.warning(f"Plan '{part_no}': plan_count={plan_count}, M_trans={M_trans}min, M_tot={M_tot}min, plan_acum={plan_acum_plan}, produced={produced_count}, start={planned_start}, end={planned_end}, eff_min={effective_minutes}, status={plan_dict.get('status')}")
+                    
+                    # DEBUG: Print visible output to console
+                    print(f"\n{'='*80}")
+                    print(f"DEBUG PLAN ACUMULADO - Plan '{part_no}'")
+                    print(f"{'='*80}")
+                    print(f"  plan_count (total):      {plan_count}")
+                    print(f"  produced_count (actual): {produced_count}")
+                    print(f"  planned_start:           {planned_start}")
+                    print(f"  planned_end:             {planned_end}")
+                    print(f"  effective_minutes:       {effective_minutes}")
+                    print(f"  M_trans (min transcur):  {M_trans} min")
+                    print(f"  M_tot (min totales):     {M_tot} min")
+                    print(f"  Fraccion transcurrida:   {M_trans/M_tot if M_tot > 0 else 0:.2%}")
+                    print(f"  plan_acum (esperado):    {plan_acum_plan}")
+                    print(f"  status:                  {plan_dict.get('status')}")
+                    print(f"{'='*80}\n")
                 
-                # Plan total ya se calculó arriba (plan_total_linea)
+                # Plan total ya se calculí³ arriba (plan_total_linea)
                 plan = plan_total_linea
                 
-                # Resultado = Plan acumulado a nivel línea
+                # Resultado = Plan acumulado a nivel lí­nea
                 resultado = Plan_acum_linea
                 plan_acumulado = Plan_acum_linea
                 
-                logger.info(f"🔍 DEBUG FINAL: Plan_acum_linea (suma) = {Plan_acum_linea}, Prod_acum_linea (suma) = {Prod_acum_linea}")
+                logger.info(f"ðŸ” DEBUG FINAL: Plan_acum_linea (suma) = {Plan_acum_linea}, Prod_acum_linea (suma) = {Prod_acum_linea}")
                 
-                # Producción acumulada = Suma de produced_count de todos los planes
+                # Produccií³n acumulada = Suma de produced_count de todos los planes
                 produccion_acumulada = Prod_acum_linea
                 
-                # Eficiencia a nivel línea = (Prod_acum_linea / Plan_acum_linea) × 100
+                # Eficiencia a nivel lí­nea = (Prod_acum_linea / Plan_acum_linea) í— 100
                 if Plan_acum_linea > 0:
                     eficiencia = (Prod_acum_linea / Plan_acum_linea) * 100
                     # Limitar a 999.9% para evitar valores absurdos
                     if eficiencia > 999.9:
-                        logger.warning(f"⚠️ Eficiencia muy alta ({eficiencia:.1f}%), limitando a 999.9%")
+                        logger.warning(f"âš ï¸ Eficiencia muy alta ({eficiencia:.1f}%), limitando a 999.9%")
                         eficiencia = 999.9
                 else:
                     eficiencia = 0.0
                 
-                logger.info(f"📊 LÍNEA {linea_seleccionada}: Plan_total={plan_total_linea}, Plan_acum={Plan_acum_linea}, Prod_acum={Prod_acum_linea}, Efic={eficiencia:.1f}%")
+                logger.info(f"ðŸ“Š LíNEA {linea_seleccionada}: Plan_total={plan_total_linea}, Plan_acum={Plan_acum_linea}, Prod_acum={Prod_acum_linea}, Efic={eficiencia:.1f}%")
                 
-                # ========== CÁLCULO DE UPH (mantener lógica anterior) ==========
+                # ========== CíLCULO DE UPH (mantener lí³gica anterior) ==========
                 uph = 0
                 upph = 0
                 
-                # UPH se mantiene desde producción real en ventana de 60 min
-                # Este cálculo NO cambia con las nuevas fórmulas
+                # UPH se mantiene desde produccií³n real en ventana de 60 min
+                # Este cálculo NO cambia con las nuevas fí³rmulas
                 import time
                 cache_key = f"uph_{linea_seleccionada}"
                 cache_time_key = f"uph_time_{linea_seleccionada}"
@@ -1306,18 +1835,18 @@ class MainWindow(QtWidgets.QMainWindow):
                 
                 if cache_valid:
                     uph = self._uph_cache[cache_key]
-                    logger.debug(f"⚡ UPH desde cache: {uph:.1f}")
+                    logger.debug(f" UPH desde cache: {uph:.1f}")
                 else:
                     try:
-                        # ⚡ OPTIMIZADO: Calcular UPH desde SQLite local (no bloquea)
+                        #  OPTIMIZADO: Calcular UPH desde SQLite local (no bloquea)
                         from ..services.dual_db import get_dual_db
                         dual_db = get_dual_db()
                         
-                        # Obtener UPH de últimos 60 minutos desde SQLite (ultra-rápido)
+                        # Obtener UPH de íºltimos 60 minutos desde SQLite (ultra-rápido)
                         t1 = ahora
                         t0 = t1 - datetime.timedelta(minutes=60)
                         
-                        # Usar método optimizado del dual_db (lee de SQLite local)
+                        # Usar mí©todo optimizado del dual_db (lee de SQLite local)
                         try:
                             with dual_db._get_sqlite_connection(timeout=0.5) as conn:
                                 cursor = conn.execute("""
@@ -1338,17 +1867,17 @@ class MainWindow(QtWidgets.QMainWindow):
                                 self._uph_cache[cache_key] = uph
                                 self._uph_cache_time[cache_time_key] = current_time
                                 
-                                logger.debug(f"⚡ UPH calculado desde SQLite: {uph} piezas")
+                                logger.debug(f" UPH calculado desde SQLite: {uph} piezas")
                         except Exception as e_sqlite:
-                            logger.debug(f"⚠️ Error calculando UPH desde SQLite: {e_sqlite}")
+                            logger.debug(f"âš ï¸ Error calculando UPH desde SQLite: {e_sqlite}")
                             uph = 0
                     except Exception as e:
-                        logger.error(f"❌ Error calculando UPH: {e}")
+                        logger.error(f"âŒ Error calculando UPH: {e}")
                         uph = 0
                 
-                logger.info(f"📊 Resumen final: Plan={plan} | Plan_acum={plan_acumulado} | Prod={produccion_acumulada} | Efic={eficiencia:.1f}% | UPH={uph}")
+                logger.info(f"ðŸ“Š Resumen final: Plan={plan} | Plan_acum={plan_acumulado} | Prod={produccion_acumulada} | Efic={eficiencia:.1f}% | UPH={uph}")
                 
-                # ========== OBTENER NÚMERO DE PERSONAS DESDE TABLA RAW DE MYSQL ==========
+                # ========== OBTENER NíšMERO DE PERSONAS DESDE TABLA RAW DE MYSQL ==========
                 num_personas = 6  # Valor por defecto
                 
                 # Buscar un plan EN PROGRESO para obtener nparte
@@ -1363,9 +1892,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 if not nparte and plan_rows:
                     nparte = plan_rows[0].get('part_no', '')
                 
-                if nparte:  # Si tenemos número de parte
+                if nparte:  # Si tenemos níºmero de parte
                     try:
-                        # ⚡ OPTIMIZADO: Usar caché para personas (evita consulta MySQL bloqueante)
+                        #  OPTIMIZADO: Usar cachí© para personas (evita consulta MySQL bloqueante)
                         personas_cache_key = f"personas_{nparte}"
                         personas_cache_time_key = f"personas_time_{nparte}"
                         
@@ -1382,7 +1911,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         
                         if personas_cache_valid:
                             num_personas = self._personas_cache[personas_cache_key]
-                            logger.debug(f"👥 Personas desde cache: {num_personas}")
+                            logger.debug(f"ðŸ‘¥ Personas desde cache: {num_personas}")
                         else:
                             # Consultar MySQL solo si no está en cache (en background no bloquea tanto)
                             with self.db.get_connection() as conn:
@@ -1402,45 +1931,45 @@ class MainWindow(QtWidgets.QMainWindow):
                                             # Guardar en cache
                                             self._personas_cache[personas_cache_key] = num_personas
                                             self._personas_cache_time[personas_cache_time_key] = current_time_personas
-                                            logger.debug(f"👥 Personas obtenidas de MySQL para {nparte}: {num_personas}")
+                                            logger.debug(f"ðŸ‘¥ Personas obtenidas de MySQL para {nparte}: {num_personas}")
                                         else:
                                             num_personas = 6
                                     else:
                                         num_personas = 6
                             
                     except Exception as e:
-                        logger.debug(f"⚠️ Error obteniendo personas: {e}")
+                        logger.debug(f"âš ï¸ Error obteniendo personas: {e}")
                         from ..config import settings as _settings
                         num_personas = getattr(_settings, 'NUM_PERSONAS_LINEA', 6)
                 else:
                     # Si no hay nparte, usar valor por defecto
                     from ..config import settings as _settings
                     num_personas = getattr(_settings, 'NUM_PERSONAS_LINEA', 6)
-                    logger.info(f"👥 Sin part_no, usando personas por defecto: {num_personas}")
+                    logger.info(f"ðŸ‘¥ Sin part_no, usando personas por defecto: {num_personas}")
                 
-                # ========== CÁLCULO DE UPPH ==========
-                # UPPH = UPH / número_personas
+                # ========== CíLCULO DE UPPH ==========
+                # UPPH = UPH / níºmero_personas
                 upph = (uph / num_personas) if num_personas > 0 and uph > 0 else 0
                 
-                logger.info(f"📊 Métricas finales: CT={num_personas} personas | UPH={uph:.1f} | UPPH={upph:.2f}")
+                logger.info(f"ðŸ“Š Mí©tricas finales: CT={num_personas} personas | UPH={uph:.1f} | UPPH={upph:.2f}")
             
-            # ⚡ Actualizar TARJETAS (verificar que existan)
+            #  Actualizar TARJETAS (verificar que existan)
             if hasattr(self.card_plan, 'value_label') and self.card_plan.value_label:
-                # PLAN TOTAL = Meta del día completo (suma de todos los modelos de la línea)
+                # PLAN TOTAL = Meta del dí­a completo (suma de todos los modelos de la lí­nea)
                 if 'plan_total_linea' in locals() and plan_total_linea > 0:
                     self.card_plan.value_label.setText(f"{int(plan_total_linea)}")
                 else:
                     self.card_plan.value_label.setText(str(plan))
             
             if hasattr(self.card_resultado, 'value_label') and self.card_resultado.value_label:
-                # PLAN ACUMULADO = Cuántas piezas DEBERÍAN llevar desde el inicio del turno
+                # PLAN ACUMULADO = Cuántas piezas DEBERíAN llevar desde el inicio del turno
                 if 'plan_acumulado' in locals() and plan_acumulado > 0:
                     self.card_resultado.value_label.setText(f"{int(plan_acumulado)}")
                 else:
                     self.card_resultado.value_label.setText("0")
             
             if hasattr(self.card_produccion, 'value_label') and self.card_produccion.value_label:
-                # PRODUCCIÓN = Cuántas piezas REALMENTE han producido desde el inicio del turno
+                # PRODUCCIí“N = Cuántas piezas REALMENTE han producido desde el inicio del turno
                 if 'produccion_acumulada' in locals():
                     self.card_produccion.value_label.setText(str(produccion_acumulada))
                 else:
@@ -1453,12 +1982,12 @@ class MainWindow(QtWidgets.QMainWindow):
             if hasattr(self.card_uphu, 'value_label') and self.card_uphu.value_label:
                 self.card_uphu.value_label.setText(f"{upph:.2f}")
             
-            # ⚡ Actualizar BARRA DE PROGRESO
+            #  Actualizar BARRA DE PROGRESO
             if hasattr(self, 'general_progress_bar') and self.general_progress_bar:
-                progress_value = int(eficiencia * 10)  # x10 para precisión
+                progress_value = int(eficiencia * 10)  # x10 para precisií³n
                 self.general_progress_bar.setValue(progress_value)
                 
-                # Cambiar color según progreso (estilo control_bom)
+                # Cambiar color segíºn progreso (estilo control_bom)
                 if eficiencia >= 100:
                     chunk_color = "stop:0 #27ae60, stop:0.5 #2ecc71, stop:1 #3be682"  # Verde brillante
                 elif eficiencia >= 80:
@@ -1486,13 +2015,30 @@ class MainWindow(QtWidgets.QMainWindow):
                         border-radius: 2px;
                     }}
                 """)
-            
-            # ⏱️ Actualizar INDICADOR DE TIEMPO (opcional - puede ser removido ya que usamos planned_start/end)
+
+            # 📊 Actualizar INDICADOR DE TIEMPO TRANSCURRIDO
             if hasattr(self, 'tiempo_transcurrido_label') and self.tiempo_transcurrido_label:
-                # Ya no usamos tiempo_transcurrido_min global, pero podemos mostrar hora actual
-                tiempo_texto = f"⏱️ Hora actual: {ahora.strftime('%H:%M')}"
-                color = "#27ae60"  # Verde
+                # DEBUG: Ver valores antes de actualizar
+                print(f"\n{'📊'*40}")
+                print(f"DEBUG TIEMPO TRANSCURRIDO:")
+                print(f"  M_trans_total = {M_trans_total}")
+                print(f"  M_tot_total = {M_tot_total}")
+                print(f"  hasattr check = {hasattr(self, 'tiempo_transcurrido_label')}")
+                print(f"  label exists = {self.tiempo_transcurrido_label is not None}")
                 
+                # Mostrar M_trans_total si hay datos de plan, sino mostrar hora actual
+                if M_tot_total > 0:
+                    porcentaje = (M_trans_total / M_tot_total) * 100
+                    tiempo_texto = f"📊 Tiempo transcurrido: {M_trans_total:.0f} / {M_tot_total:.0f} min ({porcentaje:.1f}%)"
+                    color = "#27ae60"  # Verde
+                    print(f"  … Mostrando tiempo transcurrido: {tiempo_texto}")
+                else:
+                    tiempo_texto = f"📉 Hora actual: {ahora.strftime('%H:%M')}"
+                    color = "#95a5a6"  # Gris
+                    print(f"  📉 M_tot_total = 0, mostrando hora: {tiempo_texto}")
+
+                print(f"{'📊'*40}\n")
+
                 self.tiempo_transcurrido_label.setText(tiempo_texto)
                 self.tiempo_transcurrido_label.setStyleSheet(f"""
                     color: {color};
@@ -1501,7 +2047,6 @@ class MainWindow(QtWidgets.QMainWindow):
                     background: transparent;
                     padding: 2px 0px;
                 """)
-            
             # Sincronizar métricas con ventana flotante (si está abierta)
             self._sync_metrics_to_widget()
             
@@ -1509,7 +2054,7 @@ class MainWindow(QtWidgets.QMainWindow):
             print(f"Error actualizando tarjetas de totales: {e}")
     
     def _verificar_plan_en_progreso(self):
-        """Verifica si hay algún plan actualmente en progreso"""
+        """Verifica si hay algíºn plan actualmente en progreso"""
         try:
             from ..services.dual_db import get_dual_db
             dual_db = get_dual_db()
@@ -1524,7 +2069,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return []
 
     def _verificar_plan_en_progreso_por_linea(self, linea):
-        """⚡ Verifica planes EN PROGRESO leyendo directo de SQLite"""
+        """ Verifica planes EN PROGRESO leyendo directo de SQLite"""
         try:
             from ..services.dual_db import get_dual_db
             import sqlite3
@@ -1547,7 +2092,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return []
 
     def _cambiar_estado_plan(self, plan_id, part_no, nuevo_estado, linea=None):
-        """Cambia el estado de un plan específico usando su ID único (OPTIMIZADO - Caché primero)"""
+        """Cambia el estado de un plan específico usando su ID único (OPTIMIZADO - Cache primero)"""
         try:
             # Si se quiere iniciar un plan, verificar que no haya otro en progreso EN LA MISMA LÍNEA
             if nuevo_estado == "EN PROGRESO" and linea:
@@ -1558,7 +2103,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     otros_planes = [plan for plan in planes_en_progreso if plan != part_no]
                     
                     if otros_planes:
-                        # Usar notificación estilo overlay en lugar de QMessageBox
+                        # Usar notificacií³n estilo overlay en lugar de QMessageBox
                         self._show_success_notification(
                             "Plan en Progreso",
                             f"No se puede iniciar {part_no}\nYa hay plan activo en {linea}: {', '.join(otros_planes)}",
@@ -1566,22 +2111,22 @@ class MainWindow(QtWidgets.QMainWindow):
                         )
                         return
             
-            # ========== OPTIMIZACIÓN: ACTUALIZAR CACHÉ LOCAL PRIMERO (INSTANTÁNEO) ==========
+            # ========== OPTIMIZACIí“N: ACTUALIZAR CACHí‰ LOCAL PRIMERO (INSTANTíNEO) ==========
             # Esto hace que la UI se actualice INMEDIATAMENTE sin esperar SQLite/MySQL
             from ..services.dual_db import get_dual_db
             dual_db = get_dual_db()
             
-            # Actualizar caché en memoria (no bloquea, es instantáneo)
+            # Actualizar cachí© en memoria (no bloquea, es instantáneo)
             dual_db.actualizar_estado_plan_cache_only(plan_id, nuevo_estado, linea)
             
-            # Invalidar caché de plan en progreso para forzar reconsulta
+            # Invalidar cachí© de plan en progreso para forzar reconsulta
             if hasattr(self, '_plan_en_progreso_cache'):
                 self._plan_en_progreso_cache.pop(linea, None)
             
-            # ⚡ REFRESCAR UI INMEDIATAMENTE desde caché (0ms, no toca BD)
+            #  REFRESCAR UI INMEDIATAMENTE desde cachí© (0ms, no toca BD)
             self._refresh_plan_from_cache_only()
             
-            # Mostrar notificación de éxito INMEDIATA (porque el caché ya está actualizado)
+            # Mostrar notificacií³n de í©xito INMEDIATA (porque el cachí© ya está actualizado)
             self._show_success_notification(
                 "Estado Actualizado", 
                 f"Plan {part_no}: {nuevo_estado}",
@@ -1612,47 +2157,47 @@ class MainWindow(QtWidgets.QMainWindow):
             )
     
     def _on_db_sync_finished(self, success, message):
-        """Callback cuando la sincronización de BD termina (actualiza plan después de BD)"""
+        """Callback cuando la sincronizacií³n de BD termina (actualiza plan despuí©s de BD)"""
         if success:
-            logger.debug(f"✅ {message}")
-            # Ahora SÍ refrescar plan (BD ya fue actualizada, no hay riesgo de lock)
+            logger.debug(f"… {message}")
+            # Ahora Sí refrescar plan (BD ya fue actualizada, no hay riesgo de lock)
             try:
                 self.refresh_plan_only(force=True)
             except Exception as e:
-                logger.debug(f"Error refrescando plan después de sync: {e}")
+                logger.debug(f"Error refrescando plan despuí©s de sync: {e}")
         else:
-            logger.warning(f"⚠️ {message}")
-            # Aunque falle la BD, el caché ya está actualizado (UI ya muestra el cambio)
-            # La sincronización se reintentará automáticamente
+            logger.warning(f"âš ï¸ {message}")
+            # Aunque falle la BD, el cachí© ya está actualizado (UI ya muestra el cambio)
+            # La sincronizacií³n se reintentará automáticamente
     
     def _terminar_plan(self, plan_id, part_no, linea=None):
-        """Termina un plan cambiando su estado a TERMINADO (OPTIMIZADO - Caché primero)"""
+        """Termina un plan cambiando su estado a TERMINADO (OPTIMIZADO - Cachí© primero)"""
         try:
             # Confirmar con el usuario
             reply = QtWidgets.QMessageBox.question(
                 self,
-                "Confirmar Terminación",
-                f"¿Está seguro de que desea TERMINAR el plan {part_no}?\n\nEsta acción finalizará el plan actual.",
+                "Confirmar Terminacií³n",
+                f"Â¿Está seguro de que desea TERMINAR el plan {part_no}?\n\nEsta accií³n finalizará el plan actual.",
                 QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
                 QtWidgets.QMessageBox.StandardButton.No
             )
             
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-                # ========== ACTUALIZAR CACHÉ PRIMERO (INSTANTÁNEO) ==========
+                # ========== ACTUALIZAR CACHí‰ PRIMERO (INSTANTíNEO) ==========
                 from ..services.dual_db import get_dual_db
                 dual_db = get_dual_db()
                 
-                # Actualizar caché en memoria (instantáneo)
+                # Actualizar cachí© en memoria (instantáneo)
                 dual_db.actualizar_estado_plan_cache_only(plan_id, "TERMINADO", linea)
                 
-                # Invalidar caché de plan en progreso
+                # Invalidar cachí© de plan en progreso
                 if hasattr(self, '_plan_en_progreso_cache'):
                     self._plan_en_progreso_cache.pop(linea, None)
                 
-                # NO REFRESCAR PLAN AQUÍ - El worker lo hará cuando termine de actualizar BD
+                # NO REFRESCAR PLAN AQUí - El worker lo hará cuando termine de actualizar BD
                 # Esto evita congelamiento por locks de SQLite
                 
-                # Notificación de éxito inmediata
+                # Notificacií³n de í©xito inmediata
                 self._show_success_notification(
                     "Plan Terminado",
                     f"Plan {part_no} finalizado",
@@ -1682,56 +2227,56 @@ class MainWindow(QtWidgets.QMainWindow):
             )
     
     def _on_linea_changed(self, nueva_linea: str):
-        """Maneja el cambio de línea con validación de plan en progreso"""
+        """Maneja el cambio de lí­nea con validacií³n de plan en progreso"""
         try:
-            # Si no hay nueva línea seleccionada, no hacer nada
+            # Si no hay nueva lí­nea seleccionada, no hacer nada
             if not nueva_linea:
                 return
             
-            # Si es la misma línea, no hacer nada (evitar llamadas redundantes)
+            # Si es la misma lí­nea, no hacer nada (evitar llamadas redundantes)
             if hasattr(self, '_linea_anterior') and self._linea_anterior == nueva_linea:
                 return
             
-            # 🚀 Notificar al caché de métricas sobre el cambio de línea
+            # ðŸš€ Notificar al cachí© de mí©tricas sobre el cambio de lí­nea
             try:
                 from ..services.metrics_cache import get_metrics_cache
                 metrics_cache = get_metrics_cache()
                 if metrics_cache:
                     metrics_cache.set_active_line(nueva_linea)
-                    logger.info(f"🎯 Caché de métricas actualizado a línea: {nueva_linea}")
+                    logger.info(f"ðŸŽ¯ Cachí© de mí©tricas actualizado a lí­nea: {nueva_linea}")
             except Exception as cache_err:
-                logger.debug(f"Error actualizando línea activa en caché: {cache_err}")
+                logger.debug(f"Error actualizando lí­nea activa en cachí©: {cache_err}")
             
-            # NOTA: Permitir cambio de línea libremente
-            # La validación de plan EN PROGRESO se hace en el escaneo, no en el cambio de línea
-            # Solo actualizar la línea anterior y refrescar
+            # NOTA: Permitir cambio de lí­nea libremente
+            # La validacií³n de plan EN PROGRESO se hace en el escaneo, no en el cambio de lí­nea
+            # Solo actualizar la lí­nea anterior y refrescar
             self._linea_anterior = nueva_linea
-            self.refresh_plan_only(force=True)  # Forzar actualización inmediata
+            self.refresh_plan_only(force=True)  # Forzar actualizacií³n inmediata
             
         except Exception as e:
             import logging
-            logging.error(f"Error en cambio de línea: {e}")
+            logging.error(f"Error en cambio de lí­nea: {e}")
             # En caso de error, permitir el cambio
             self._linea_anterior = nueva_linea
-            self.refresh_plan_only(force=True)  # Forzar actualización inmediata
+            self.refresh_plan_only(force=True)  # Forzar actualizacií³n inmediata
     
     def _check_inactivity(self):
         """Verifica inactividad y pausa automáticamente el plan si no hay escaneos en 1.5 minutos"""
         try:
-            # Obtener la línea actualmente seleccionada
+            # Obtener la lí­nea actualmente seleccionada
             linea_actual = self.linea_selector.currentText() if hasattr(self, 'linea_selector') else None
             if not linea_actual:
                 return
             
-            # Verificar si hay un plan en progreso en la línea actual
+            # Verificar si hay un plan en progreso en la lí­nea actual
             planes_en_progreso = self._verificar_plan_en_progreso_por_linea(linea_actual)
             
             if not planes_en_progreso:
-                # No hay plan en progreso, invalidar caché y no hacer nada
+                # No hay plan en progreso, invalidar cachí© y no hacer nada
                 self._plan_en_progreso_cache.pop(linea_actual, None)
                 return
             
-            # Obtener el último tiempo de escaneo para esta línea
+            # Obtener el íºltimo tiempo de escaneo para esta lí­nea
             ultimo_escaneo = self._last_scan_time_per_line.get(linea_actual)
             
             if ultimo_escaneo is None:
@@ -1740,7 +2285,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._last_scan_time_per_line[linea_actual] = time.time()
                 return
             
-            # Calcular tiempo transcurrido desde el último escaneo
+            # Calcular tiempo transcurrido desde el íºltimo escaneo
             import time
             tiempo_transcurrido = time.time() - ultimo_escaneo
             
@@ -1748,16 +2293,16 @@ class MainWindow(QtWidgets.QMainWindow):
             TIEMPO_INACTIVIDAD = 90  # 90 segundos = 1.5 minutos
             
             if tiempo_transcurrido >= TIEMPO_INACTIVIDAD:
-                # Obtener el plan_id del plan en progreso (usar caché si está disponible)
+                # Obtener el plan_id del plan en progreso (usar cachí© si está disponible)
                 from ..services.dual_db import get_dual_db
                 dual_db = get_dual_db()
                 
-                # Verificar caché primero (válido por 60 segundos)
+                # Verificar cachí© primero (válido por 60 segundos)
                 cache_entry = self._plan_en_progreso_cache.get(linea_actual)
                 if cache_entry and (time.time() - cache_entry[2]) < 60:
                     plan_id, part_no = cache_entry[0], cache_entry[1]
                 else:
-                    # Consultar SQLite solo si caché expiró o no existe
+                    # Consultar SQLite solo si cachí© expirí³ o no existe
                     import sqlite3
                     with sqlite3.connect(dual_db.sqlite_path, timeout=5.0) as conn:
                         cursor = conn.execute("""
@@ -1768,29 +2313,29 @@ class MainWindow(QtWidgets.QMainWindow):
                         
                         result = cursor.fetchone()
                         if not result:
-                            # No hay plan en progreso, invalidar caché
+                            # No hay plan en progreso, invalidar cachí©
                             self._plan_en_progreso_cache.pop(linea_actual, None)
                             return
                         
                         plan_id, part_no = result
-                        # Actualizar caché
+                        # Actualizar cachí©
                         self._plan_en_progreso_cache[linea_actual] = (plan_id, part_no, time.time())
                 
                 # Pausar automáticamente el plan
                 if plan_id and part_no:
-                    # Pausar automáticamente el plan (OPTIMIZADO - Caché primero)
-                    logger.info(f"🔴 Auto-pausa por inactividad: {part_no} en línea {linea_actual} ({tiempo_transcurrido:.0f}s sin escaneo)")
+                    # Pausar automáticamente el plan (OPTIMIZADO - Cachí© primero)
+                    logger.info(f"ðŸ”´ Auto-pausa por inactividad: {part_no} en lí­nea {linea_actual} ({tiempo_transcurrido:.0f}s sin escaneo)")
                     
-                    # ========== ACTUALIZAR CACHÉ PRIMERO (INSTANTÁNEO) ==========
+                    # ========== ACTUALIZAR CACHí‰ PRIMERO (INSTANTíNEO) ==========
                     dual_db.actualizar_estado_plan_cache_only(plan_id, "PAUSADO", linea_actual)
                     
-                    # Invalidar caché de plan en progreso
+                    # Invalidar cachí© de plan en progreso
                     self._plan_en_progreso_cache.pop(linea_actual, None)
                     
-                    # NO REFRESCAR PLAN AQUÍ - El worker lo hará cuando termine de actualizar BD
+                    # NO REFRESCAR PLAN AQUí - El worker lo hará cuando termine de actualizar BD
                     # Esto evita congelamiento por locks de SQLite
                     
-                    # Notificación inmediata
+                    # Notificacií³n inmediata
                     self._show_success_notification(
                         "Plan Pausado Automáticamente",
                         f"Plan {part_no}",
@@ -1810,7 +2355,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     # Iniciar worker
                     worker.start()
                     
-                    # Resetear el contador para esta línea
+                    # Resetear el contador para esta lí­nea
                     self._last_scan_time_per_line[linea_actual] = time.time()
                         
         except Exception as e:
@@ -1818,12 +2363,12 @@ class MainWindow(QtWidgets.QMainWindow):
             logging.error(f"Error verificando inactividad: {e}")
     
     def _show_success_notification(self, titulo: str, mensaje: str, color: str = "#28a745"):
-        """Muestra una notificación de éxito para operaciones exitosas"""
+        """Muestra una notificacií³n de í©xito para operaciones exitosas"""
         if not self.duplicate_overlay:
             return
         self.duplicate_overlay.setText(f"{titulo}\n{mensaje}\nACTUALIZADO")
         
-        # Ajustar estilo y tamaño según modo pantalla completa
+        # Ajustar estilo y tamaí±o segíºn modo pantalla completa
         if self._fullscreen_mode:
             self.duplicate_overlay.resize(800, 300)
             self.duplicate_overlay.setStyleSheet(f"""
@@ -1856,11 +2401,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._center_overlay(self.duplicate_overlay)
         self.duplicate_overlay.show()
         
-        # Auto-ocultar después de 2 segundos
+        # Auto-ocultar despuí©s de 2 segundos
         QtCore.QTimer.singleShot(2000, self.duplicate_overlay.hide)
 
     def _create_exit_fullscreen_button(self):
-        """Crea el botón para salir del modo pantalla completa"""
+        """Crea el botí³n para salir del modo pantalla completa"""
         self.exit_fullscreen_btn = QtWidgets.QPushButton("X", self)
         self.exit_fullscreen_btn.setStyleSheet("""
             QPushButton {
@@ -1886,7 +2431,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.exit_fullscreen_btn.clicked.connect(self.toggle_fullscreen_mode)
         self.exit_fullscreen_btn.hide()  # Inicialmente oculto
         
-        # Posicionar el botón en la esquina superior derecha
+        # Posicionar el botí³n en la esquina superior derecha
         self.exit_fullscreen_btn.move(self.width() - 60, 20)
 
     def resizeEvent(self, event):
@@ -1897,7 +2442,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.ok_overlay and self.ok_overlay.isVisible():
             self._center_overlay(self.ok_overlay)
         
-        # Reposicionar botón de salir del modo pantalla completa
+        # Reposicionar botí³n de salir del modo pantalla completa
         if hasattr(self, 'exit_fullscreen_btn'):
             self.exit_fullscreen_btn.move(self.width() - 60, 20)
 
@@ -1912,37 +2457,37 @@ class MainWindow(QtWidgets.QMainWindow):
         overlay.move(center_x, center_y)
 
     def handle_scan(self) -> None:
-        """⚡ ULTRA-RÁPIDO: Procesa escaneo en background sin bloquear UI"""
+        """ ULTRA-RíPIDO: Procesa escaneo en background sin bloquear UI"""
         raw = self.scan_input.text()
         if not raw:
             return
         
-        # ⚡ PROTECCIÓN ANTI-DUPLICADOS: Evitar procesar el mismo código dos veces seguidas
+        #  PROTECCIí“N ANTI-DUPLICADOS: Evitar procesar el mismo cí³digo dos veces seguidas
         import time
         current_time = time.time() * 1000  # ms
         if raw == self._last_processed_code and (current_time - self._last_processed_time) < 1000:
-            # Mismo código en menos de 1 segundo - ignorar duplicado
+            # Mismo cí³digo en menos de 1 segundo - ignorar duplicado
             self.scan_input.clear()
-            logger.debug(f"🔇 Código duplicado ignorado: {raw[:30]}...")
+            logger.debug(f"ðŸ”‡ Cí³digo duplicado ignorado: {raw[:30]}...")
             return
         
-        # Registrar este código como procesado
+        # Registrar este cí³digo como procesado
         self._last_processed_code = raw
         self._last_processed_time = current_time
         
-        # ⚡ LIMPIAR INMEDIATAMENTE para que el usuario pueda escanear el siguiente
+        #  LIMPIAR INMEDIATAMENTE para que el usuario pueda escanear el siguiente
         self.scan_input.clear()
         
         # Normalizar texto del escáner
         raw = normalize_scanner_text(raw)
         selected_linea = self.linea_selector.currentText()
         
-        # ⚡⚡⚡ VALIDACIÓN INSTANTÁNEA Y FEEDBACK VISUAL INMEDIATO ⚡⚡⚡
-        # Extraer nparte del código SIN tocar BD (< 1ms)
+        #  VALIDACIí“N INSTANTíNEA Y FEEDBACK VISUAL INMEDIATO 
+        # Extraer nparte del cí³digo SIN tocar BD (< 1ms)
         validation_result = self._fast_validate_scan(raw, selected_linea)
         
         if validation_result['valid']:
-            # ✅ CÓDIGO VÁLIDO - MOSTRAR OK INMEDIATAMENTE
+            # … Cí“DIGO VíLIDO - MOSTRAR OK INMEDIATAMENTE
             _play_success_sound()
             self._show_ok_overlay(validation_result['kind'])
             
@@ -1950,7 +2495,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.scan_input.setStyleSheet("background-color: #c8e6c9;")  # Verde más intenso
             QtCore.QTimer.singleShot(300, lambda: self.scan_input.setStyleSheet(""))
         else:
-            # ❌ ERROR - Mostrar error inmediatamente
+            # âŒ ERROR - Mostrar error inmediatamente
             if validation_result.get('play_sound', True):
                 _play_error_sound()
             if validation_result.get('message'):
@@ -1960,7 +2505,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     color=validation_result.get('color', '#FF3333')
                 )
         
-        # ⚡ PROCESAR EN BACKGROUND THREAD (no bloquea UI)
+        #  PROCESAR EN BACKGROUND THREAD (no bloquea UI)
         class ScanWorker(QtCore.QThread):
             finished = QtCore.pyqtSignal(int, str, str)  # result, raw, linea
             
@@ -1989,10 +2534,10 @@ class MainWindow(QtWidgets.QMainWindow):
         
         worker.start()
         
-        # ⚡ UI YA ESTÁ LISTA PARA EL SIGUIENTE ESCANEO (no espera a que termine el worker)
+        #  UI YA ESTí LISTA PARA EL SIGUIENTE ESCANEO (no espera a que termine el worker)
     
     def _fast_validate_scan(self, raw: str, linea: str) -> dict:
-        """⚡ VALIDACIÓN ULTRA-RÁPIDA (< 1ms) - Solo verifica que el modelo coincida con plan EN PROGRESO"""
+        """ VALIDACIí“N ULTRA-RíPIDA (< 1ms) - Solo verifica que el modelo coincida con plan EN PROGRESO"""
         try:
             from ..services.parser import parse_qr_scan, parse_barcode_scan, detect_scan_format
             from ..services.dual_db import get_dual_db
@@ -2016,12 +2561,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 logger.debug(f"Error parseando: {e}")
                 return {'valid': False, 'message': 'ERROR DE FORMATO', 'color': '#FF3333'}
             
-            # ⚡ VALIDACIÓN DESDE CACHÉ (0ms - no toca BD)
+            #  VALIDACIí“N DESDE CACHí‰ (0ms - no toca BD)
             dual_db = get_dual_db()
             if hasattr(dual_db, '_plan_cache') and dual_db._plan_cache:
                 nparte_escaneado = nparte.strip().upper()
                 
-                # Buscar plan EN PROGRESO en caché
+                # Buscar plan EN PROGRESO en cachí©
                 plan_en_progreso = None
                 for plan in dual_db._plan_cache:
                     if plan.get('line') == linea and plan.get('status') == 'EN PROGRESO':
@@ -2029,21 +2574,21 @@ class MainWindow(QtWidgets.QMainWindow):
                         break
                 
                 if plan_en_progreso:
-                    # ✅ HAY PLAN EN PROGRESO: Solo comparar con ese plan
+                    # … HAY PLAN EN PROGRESO: Solo comparar con ese plan
                     plan_nparte_activo = plan_en_progreso.get('part_no', '').strip().upper()
                     
                     if nparte_escaneado != plan_nparte_activo:
-                        # NO coincide → MODELO DIFERENTE (sin buscar en otros planes)
+                        # NO coincide â†’ MODELO DIFERENTE (sin buscar en otros planes)
                         return {
                             'valid': False, 
-                            'message': f'❌ MODELO DIFERENTE\nPlan: {plan_nparte_activo}\nEscaneado: {nparte_escaneado}',
+                            'message': f'âŒ MODELO DIFERENTE\nPlan: {plan_nparte_activo}\nEscaneado: {nparte_escaneado}',
                             'color': '#FF3333'
                         }
                     
-                    # ✅ Coincide - OK inmediato
+                    # … Coincide - OK inmediato
                     return {'valid': True, 'kind': kind}
                 else:
-                    # ⚠️ NO HAY PLAN EN PROGRESO: Verificar si existe en algún plan de la línea
+                    # âš ï¸ NO HAY PLAN EN PROGRESO: Verificar si existe en algíºn plan de la lí­nea
                     codigo_existe_en_plan = False
                     for plan in dual_db._plan_cache:
                         if plan.get('line') == linea:
@@ -2056,10 +2601,10 @@ class MainWindow(QtWidgets.QMainWindow):
                         # Existe en plan pero ninguno está EN PROGRESO
                         return {'valid': False, 'message': 'NO EN PROGRESO', 'color': '#FF8800'}
                     else:
-                        # No existe en ningún plan de la línea
-                        return {'valid': False, 'message': f'❌ NO EN PLAN\nEscaneado: {nparte_escaneado}', 'color': '#CC3333'}
+                        # No existe en ningíºn plan de la lí­nea
+                        return {'valid': False, 'message': f'âŒ NO EN PLAN\nEscaneado: {nparte_escaneado}', 'color': '#CC3333'}
             
-            # Si no hay caché, asumir válido (el worker validará completo)
+            # Si no hay cachí©, asumir válido (el worker validará completo)
             return {'valid': True, 'kind': kind}
             
         except Exception as e:
@@ -2068,54 +2613,121 @@ class MainWindow(QtWidgets.QMainWindow):
             return {'valid': True, 'kind': 'OK'}
     
     def _on_scan_processed(self, result: int, raw: str, linea: str) -> None:
-        """⚡ Callback cuando el worker termina de procesar el escaneo"""
+        """ Callback cuando el worker termina de procesar el escaneo"""
         try:
-            if result > 0:
-                # ✅ ÉXITO - PAR COMPLETO
-                # ⚠️ NO reproducir sonido ni overlay aquí - ya se mostró en handle_scan()
+            if result == 999999:  # PAR COMPLETO`n                # PAR COMPLETO - QR+BARCODE emparejados exitosamente`n                try:`n                    from ..services.parser import detect_scan_format`n                    scan_type = detect_scan_format(raw)`n                    self._add_scan_to_history(raw, scan_type, success=True, message="PAR COMPLETO")`n                except Exception as e:`n                    logger.debug(f"Error agregando a historial: {e}")`n                `n                # Actualizar timestamp para timer de inactividad`n                import time`n                self._last_scan_time_per_line[linea] = time.time()`n                `n                # Actualizar UI en background (no bloquea)`n                QtCore.QTimer.singleShot(50, lambda: self._update_ui_after_scan(raw, linea))`n                `n            elif result == -5:  # ESPERANDO PAR`n                # Primera parte del par - esperando complemento`n                try:`n                    from ..services.parser import detect_scan_format`n                    scan_type = detect_scan_format(raw)`n                    self._add_scan_to_history(raw, scan_type, success=True, message="Esperando par")`n                except Exception as e:`n                    logger.debug(f"Error agregando a historial: {e}")`n                `n                # Actualizar timestamp`n                import time`n                self._last_scan_time_per_line[linea] = time.time()`n                `n                # Actualizar UI`n                QtCore.QTimer.singleShot(50, lambda: self._update_ui_after_scan(raw, linea))`n                `n            elif result > 0:
+                # … í‰XITO - PAR COMPLETO
+                # âš ï¸ NO reproducir sonido ni overlay aquí­ - ya se mostrí³ en handle_scan()
+                
+                # ðŸ“œ Agregar al historial de scans (detectar tipo automáticamente)
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=True, message="PAR COMPLETO")
+                except Exception as e:
+                    logger.debug(f"Error agregando a historial: {e}")
                 
                 # Actualizar timestamp para timer de inactividad
                 import time
                 self._last_scan_time_per_line[linea] = time.time()
 
                 
-                # ⚡ Actualizar UI en background (no bloquea)
+                #  Actualizar UI en background (no bloquea)
                 QtCore.QTimer.singleShot(50, lambda: self._update_ui_after_scan(raw, linea))
                 
             elif result == 0:
-                # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificación)
-                logger.debug(f"🔇 Duplicado ignorado en UI: {raw[:30]}...")
-                pass  # No hacer nada, es normal en producción
+                # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificacií³n)
+                # Agregar a historial pero sin error
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=True, message="Duplicado")
+                except Exception:
+                    pass
+                logger.debug(f"ðŸ”‡ Duplicado ignorado en UI: {raw[:30]}...")
+                pass  # No hacer nada, es normal en produccií³n
             elif result == -3:
                 _play_error_sound()
                 self._show_plan_notification("NO EN PLAN", raw, color="#CC3333")
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=False, message="NO EN PLAN")
+                except Exception:
+                    pass
             elif result == -4:
                 _play_error_sound()
                 self._show_plan_notification("NO EN PROGRESO", raw, color="#FF8800")
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=False, message="NO EN PROGRESO")
+                except Exception:
+                    pass
             elif result == -5:
-                # Guardado, esperando complemento - SIN NOTIFICACIÓN (silencioso)
-                pass
+                # Guardado, esperando complemento - SIN NOTIFICACIí“N (silencioso)
+                # Agregar a historial como í©xito parcial
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=True, message="Esperando par")
+                except Exception:
+                    pass
             elif result == -6:
                 _play_error_sound()
                 self._show_plan_notification("INICIA PLAN EN MES", raw, color="#991313")
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=False, message="INICIA PLAN")
+                except Exception:
+                    pass
             elif result == -7:
                 _play_error_sound()
                 self._show_plan_notification("SUB ASSY: NO MATCH", raw, color="#991313")
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=False, message="NO MATCH")
+                except Exception:
+                    pass
             elif result == -8:
-                self._show_plan_notification("❌ QR DUPLICADO\nEscanea BARCODE", raw, color="#FF3333")
+                _play_error_sound()
+                self._show_plan_notification("REGRESA TARJETA", raw, color="#FF3333")
+                try:
+                    self._add_scan_to_history(raw, "QR", success=False, message="REGRESA TARJETA (QR+QR)")
+                except Exception:
+                    pass
             elif result == -9:
-                self._show_plan_notification("❌ BARCODE DUPLICADO\nEscanea QR", raw, color="#FF3333")
+                _play_error_sound()
+                self._show_plan_notification("REGRESA TARJETA", raw, color="#FF3333")
+                try:
+                    self._add_scan_to_history(raw, "BARCODE", success=False, message="REGRESA TARJETA (BC+BC)")
+                except Exception:
+                    pass
             elif result == -10:
                 _play_error_sound()
-                self._show_plan_notification("❌ MODELO DIFERENTE", raw, color="#FF3333")
+                self._show_plan_notification("MODELO DIFERENTE", raw, color="#FF3333")
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=False, message="MODELO DIFERENTE")
+                except Exception:
+                    pass
             else:
                 _play_error_sound()
                 QtWidgets.QMessageBox.warning(self, "Error", "Error al procesar escaneo")
+                try:
+                    from ..services.parser import detect_scan_format
+                    scan_type = detect_scan_format(raw)
+                    self._add_scan_to_history(raw, scan_type, success=False, message="ERROR")
+                except Exception:
+                    pass
         except Exception as e:
             logger.error(f"Error en _on_scan_processed: {e}")
     
     def _update_ui_after_scan(self, raw: str, linea: str) -> None:
-        """⚡ Actualiza UI después de escaneo exitoso (ejecuta en background)"""
+        """ Actualiza UI despuí©s de escaneo exitoso (ejecuta en background)"""
         try:
             from ..services.parser import parse_qr
             parsed = parse_qr(raw)
@@ -2128,7 +2740,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 except Exception as e:
                     logger.debug(f"Error actualizando tabla: {e}")
                 
-                # Actualizar cache de métricas
+                # Actualizar cache de mí©tricas
                 try:
                     from ..services.metrics_cache import get_metrics_cache
                     from datetime import date
@@ -2143,23 +2755,27 @@ class MainWindow(QtWidgets.QMainWindow):
                                 cached['eficiencia'] = (cached['produccion_real'] / cached['plan_acumulado']) * 100
                             metrics_cache.update_metrics_instant(linea, fecha_hoy, cached)
                             
-                            # Actualizar cards si es la línea actual
-                            if self.linea_selector.currentText() == linea:
-                                self._update_cards_with_metrics(
-                                    cached['plan_total'],
-                                    cached['plan_acumulado'],
-                                    cached['produccion_real'],
-                                    cached['eficiencia'],
-                                    cached['uph'],
-                                    cached['upph']
-                                )
+                            # âš ï¸ NO actualizar cards desde cachí© - ahora usamos cálculo directo desde SQLite
+                            # El timer de _update_plan_totals() se encarga de actualizar las tarjetas
+                            # correctamente con el cálculo de tiempo transcurrido
+                            
+                            # Cí“DIGO VIEJO (DESHABILITADO):
+                            # if self.linea_selector.currentText() == linea:
+                            #     self._update_cards_with_metrics(
+                            #         cached['plan_total'],
+                            #         cached['plan_acumulado'],  # âŒ Este valor es INCORRECTO (no usa tiempo transcurrido)
+                            #         cached['produccion_real'],
+                            #         cached['eficiencia'],
+                            #         cached['uph'],
+                            #         cached['upph']
+                            #     )
                 except Exception as e:
                     logger.debug(f"Error actualizando cache: {e}")
         except Exception as e:
             logger.debug(f"Error en _update_ui_after_scan: {e}")
 
     def _create_duplicate_overlay(self):
-        """Crea el overlay de notificación para duplicados"""
+        """Crea el overlay de notificacií³n para duplicados"""
         self.duplicate_overlay = QtWidgets.QLabel(self)
         self.duplicate_overlay.setText("ESCANEO DUPLICADO")
         self.duplicate_overlay.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -2178,7 +2794,7 @@ class MainWindow(QtWidgets.QMainWindow):
             }
         """)
         
-        # Ocultar inicialmente y asegurar que esté encima de todo
+        # Ocultar inicialmente y asegurar que estí© encima de todo
         self.duplicate_overlay.hide()
         self.duplicate_overlay.setWindowFlags(QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.WindowStaysOnTopHint)
 
@@ -2193,7 +2809,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self.ok_overlay.resize(360, 140)
         self.ok_overlay.hide()
-        # Asegurar que esté encima de todo
+        # Asegurar que estí© encima de todo
         self.ok_overlay.setWindowFlags(QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.WindowStaysOnTopHint)
         
     def _show_duplicate_notification(self, scan_code: str):
@@ -2208,10 +2824,10 @@ class MainWindow(QtWidgets.QMainWindow):
             scan_fmt = 'BARCODE' if fmt == 'BARCODE' else 'QR'
             if scan_fmt == 'BARCODE':
                 title = 'BARCODE DUPLICADO'
-                details = "Este código ya fue escaneado"
+                details = "Este cí³digo ya fue escaneado"
             else:
                 title = 'QR DUPLICADO'
-                details = "Este código ya fue escaneado"
+                details = "Este cí³digo ya fue escaneado"
         except Exception:
             pass
 
@@ -2219,10 +2835,10 @@ class MainWindow(QtWidgets.QMainWindow):
             f"{title}\n{scan_code}\n{details}\nYA EXISTE EN EL SISTEMA"
         )
 
-        # Ajustar tamaño según modo pantalla completa
+        # Ajustar tamaí±o segíºn modo pantalla completa
         if self._fullscreen_mode:
             self.duplicate_overlay.resize(900, 350)
-            # Aumentar tamaño de fuente para pantalla completa
+            # Aumentar tamaí±o de fuente para pantalla completa
             self.duplicate_overlay.setStyleSheet("""
                 QLabel {
                     background-color: rgba(220, 20, 20, 0.95);
@@ -2255,7 +2871,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.duplicate_overlay.show()
         self.duplicate_overlay.raise_()
 
-        # ⚡ Mostrar ultra-rápido 200ms para escaneo continuo
+        #  Mostrar ultra-rápido 200ms para escaneo continuo
         self.duplicate_timer.start(200)
 
     def _show_plan_notification(self, titulo: str, scan_code: str, color: str = "#004c99"):
@@ -2263,7 +2879,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.duplicate_overlay.setText(f"{titulo}\n{scan_code}\nNO SE ACEPTA")
         
-        # Ajustar estilo y tamaño según modo pantalla completa
+        # Ajustar estilo y tamaí±o segíºn modo pantalla completa
         if self._fullscreen_mode:
             self.duplicate_overlay.resize(800, 300)
             self.duplicate_overlay.setStyleSheet("""
@@ -2298,8 +2914,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._center_overlay(self.duplicate_overlay)
         self.duplicate_overlay.show()
         self.duplicate_overlay.raise_()
-        # ⏰ Duración 2 segundos para que sea visible
-        self.duplicate_timer.start(2000)
+        # â° Duracií³n 2 segundos para que sea visible
+        self.duplicate_timer.start(5000)
 
     def _show_wait_pair(self, expected_format: str, scan_code: str):
         """Muestra overlay indicando que falta el formato complementario (QR o BARCODE)."""
@@ -2311,7 +2927,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return
     
     def _hide_duplicate_overlay(self):
-        """Oculta el overlay de notificación"""
+        """Oculta el overlay de notificacií³n"""
         if self.duplicate_overlay:
             self.duplicate_overlay.hide()
 
@@ -2325,7 +2941,7 @@ class MainWindow(QtWidgets.QMainWindow):
             kind_txt = f"✓ OK {kind_txt}"
         self.ok_overlay.setText(f"{kind_txt}")
         
-        # Ajustar tamaño y estilo según modo pantalla completa
+        # Ajustar tamaí±o y estilo segíºn modo pantalla completa
         # Estilos simplificados en modo OPTIMIZED para PCs lentas
         is_optimized = os.environ.get('APP_PERFORMANCE_MODE') == 'OPTIMIZED'
         
@@ -2376,7 +2992,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._center_overlay(self.ok_overlay)
         self.ok_overlay.show()
         self.ok_overlay.raise_()
-        # ⚡ Ultra-rápido para máxima fluidez
+        #  Ultra-rápido para máxima fluidez
         duration = 100 if getattr(settings, 'SOLO_QR_MODE', False) else 150
         self.ok_timer.start(duration)
 
@@ -2391,7 +3007,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 if self._fullscreen_mode:
                     if self.focusWidget() is not self.scan_input:
                         self.scan_input.setFocus()
-                        self.scan_input.raise_()  # Asegurar que esté al frente
+                        self.scan_input.raise_()  # Asegurar que estí© al frente
                 else:
                     if self.focusWidget() is not self.scan_input:
                         self.scan_input.setFocus()
@@ -2407,7 +3023,7 @@ class MainWindow(QtWidgets.QMainWindow):
             # Normalizar texto antes de verificar
             raw_normalized = normalize_scanner_text(raw) if raw else raw
             
-            # Validar formato básico primero (QR nuevo ñ o antiguo ;)
+            # Validar formato básico primero (QR nuevo í± o antiguo ;)
             if not raw_normalized or not raw_normalized.strip() or not is_complete_qr(raw_normalized.strip()):
                 return False
                 
@@ -2438,21 +3054,21 @@ class MainWindow(QtWidgets.QMainWindow):
         # Normalizar texto del escáner para compatibilidad con distribuciones de teclado
         raw = normalize_scanner_text(raw)
         
-        # EVITAR DUPLICADOS - verificar si ya procesamos este código
+        # EVITAR DUPLICADOS - verificar si ya procesamos este cí³digo
         import time
         current_time = time.time() * 1000  # ms
         if raw == self._last_processed_code and (current_time - self._last_processed_time) < 500:
-            # Mismo código en menos de 500ms - ignorar duplicado
+            # Mismo cí³digo en menos de 500ms - ignorar duplicado
             self.scan_input.clear()
             return
         
-        # ⚡ NO limpiar aquí - dejar que el escáner termine de escribir
+        #  NO limpiar aquí­ - dejar que el escáner termine de escribir
         # La limpieza se hará en _process_complete_qr o _process_pending_barcode
         
-        # Considerar QR completo cuando cumple patrón (nuevo ñ o antiguo ;)
+        # Considerar QR completo cuando cumple patrí³n (nuevo í± o antiguo ;)
         if not is_complete_qr(raw):
-            # Posible BARCODE (no lleva ';') -> usar heurística y debounce
-            # Condición: longitud mínima 13, últimos 12 dígitos, todo alfanumérico
+            # Posible BARCODE (no lleva ';') -> usar heurí­stica y debounce
+            # Condicií³n: longitud mí­nima 13, íºltimos 12 dí­gitos, todo alfanumí©rico
             if len(raw) >= 8 and raw.replace('_','').replace('-','').isalnum():
                 import time, statistics
                 now_ms = time.perf_counter() * 1000.0
@@ -2474,7 +3090,7 @@ class MainWindow(QtWidgets.QMainWindow):
                             gap = self._barcode_end_gap_slow
                     except Exception:
                         pass
-                # Heurística adicional: si los últimos 12 son dígitos y longitud >=13 forzar gap rápido
+                # Heurí­stica adicional: si los íºltimos 12 son dí­gitos y longitud >=13 forzar gap rápido
                 if len(raw) >= 13 and raw[-12:].isdigit():
                     gap = min(gap, self._barcode_end_gap_fast)
                 self._barcode_timer.start(int(gap))
@@ -2484,20 +3100,20 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         
         # Detectado QR con 4 secciones ';' - es QR en progreso
-        # ⚡ NO guardar ni limpiar aquí - esperar a que termine completamente
+        #  NO guardar ni limpiar aquí­ - esperar a que termine completamente
         # El timer procesará cuando el escáner termine de escribir
         self._qr_complete_timer.start(self._qr_complete_delay_ms)
         return
 
     def _process_complete_qr(self):
-        """Procesa QR completo después de esperar posibles líneas adicionales"""
+        """Procesa QR completo despuí©s de esperar posibles lí­neas adicionales"""
         if self._processing_scan:
             return
         
-        # 🔒 Bloquear actualizaciones durante el escaneo
+        # ðŸ”’ Bloquear actualizaciones durante el escaneo
         self._scan_in_progress = True
         
-        # ⚡ Leer del input AHORA (el escáner ya terminó de escribir)
+        #  Leer del input AHORA (el escáner ya terminí³ de escribir)
         raw = (self.scan_input.text() or '').strip()
         if not raw:
             self._scan_in_progress = False  # Desbloquear
@@ -2513,7 +3129,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.scan_input.clear()  # Limpiar duplicado
             return
         
-        # ⚡ LIMPIAR INPUT AHORA (después de leer)
+        #  LIMPIAR INPUT AHORA (despuí©s de leer)
         self.scan_input.clear()
         
         # Marcar como procesado
@@ -2526,11 +3142,11 @@ class MainWindow(QtWidgets.QMainWindow):
             selected_linea = self.linea_selector.currentText()
             result = process_scan_direct(raw, selected_linea)
             
-            if result > 0:
-                # ✅ Reproducir sonido de éxito
+            if result == 999999:  # PAR COMPLETO`n                # PAR COMPLETO - QR+BARCODE emparejados exitosamente`n                try:`n                    from ..services.parser import detect_scan_format`n                    scan_type = detect_scan_format(raw)`n                    self._add_scan_to_history(raw, scan_type, success=True, message="PAR COMPLETO")`n                except Exception as e:`n                    logger.debug(f"Error agregando a historial: {e}")`n                `n                # Actualizar timestamp para timer de inactividad`n                import time`n                self._last_scan_time_per_line[linea] = time.time()`n                `n                # Actualizar UI en background (no bloquea)`n                QtCore.QTimer.singleShot(50, lambda: self._update_ui_after_scan(raw, linea))`n                `n            elif result == -5:  # ESPERANDO PAR`n                # Primera parte del par - esperando complemento`n                try:`n                    from ..services.parser import detect_scan_format`n                    scan_type = detect_scan_format(raw)`n                    self._add_scan_to_history(raw, scan_type, success=True, message="Esperando par")`n                except Exception as e:`n                    logger.debug(f"Error agregando a historial: {e}")`n                `n                # Actualizar timestamp`n                import time`n                self._last_scan_time_per_line[linea] = time.time()`n                `n                # Actualizar UI`n                QtCore.QTimer.singleShot(50, lambda: self._update_ui_after_scan(raw, linea))`n                `n            elif result > 0:
+                # … Reproducir sonido de í©xito
                 _play_success_sound()
                 
-                # ⚡ OPTIMIZACIÓN MÁXIMA: NO actualizar plan ni totales aquí
+                #  OPTIMIZACIí“N MíXIMA: NO actualizar plan ni totales aquí­
                 # Solo mostrar overlay y actualizar contador en memoria (instantáneo)
                 self._show_ok_overlay("QR")
                 
@@ -2546,12 +3162,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Actualizar status con contador (no toca DB)
                 self.update_status_fast()
                 
-                # ❌ ELIMINADO refresh_plan_only y refresh_totals_only (causaban congelamiento)
-                # ✅ El timer de 15 SEGUNDOS se encarga de actualizar automáticamente (optimizado con Dual DB)
+                # âŒ ELIMINADO refresh_plan_only y refresh_totals_only (causaban congelamiento)
+                # … El timer de 15 SEGUNDOS se encarga de actualizar automáticamente (optimizado con Dual DB)
             elif result == 0:
-                # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificación)
-                logger.debug(f"🔇 Duplicado ignorado en UI (_process_complete_qr): {raw[:30]}...")
-                pass  # No hacer nada, es normal en producción
+                # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificacií³n)
+                logger.debug(f"ðŸ”‡ Duplicado ignorado en UI (_process_complete_qr): {raw[:30]}...")
+                pass  # No hacer nada, es normal en produccií³n
             elif result == -3:
                 _play_error_sound()
                 self._show_plan_notification("NO EN PLAN", raw, color="#CC3333")
@@ -2574,21 +3190,21 @@ class MainWindow(QtWidgets.QMainWindow):
             elif result == -8:
                 # QR duplicado - verificar si es consecutivo
                 if raw == self._last_processed_code:
-                    logger.debug(f"🔇 QR duplicado consecutivo ignorado: {raw[:20]}...")
+                    logger.debug(f"QR duplicado consecutivo ignorado: {raw[:20]}...")
                     return
                 # No es consecutivo - mostrar sin sonido
-                self._show_plan_notification("❌ QR DUPLICADO\nEscanea BARCODE", raw, color="#FF3333")
+                self._show_plan_notification("QR DUPLICADO\nEscanea BARCODE", raw, color="#FF3333")
             elif result == -9:
                 # BARCODE duplicado - verificar si es consecutivo
                 if raw == self._last_processed_code:
-                    logger.debug(f"🔇 BARCODE duplicado consecutivo ignorado: {raw[:20]}...")
+                    logger.debug(f"BARCODE duplicado consecutivo ignorado: {raw[:20]}...")
                     return
                 # No es consecutivo - mostrar sin sonido
-                self._show_plan_notification("❌ BARCODE DUPLICADO\nEscanea QR", raw, color="#FF3333")
+                self._show_plan_notification("BARCODE DUPLICADO\nEscanea QR", raw, color="#FF3333")
             elif result == -10:
                 # Modelo diferente al plan EN PROGRESO
                 _play_error_sound()
-                self._show_plan_notification("❌ MODELO DIFERENTE\nAL PLAN EN PROGRESO", raw, color="#FF3333")
+                self._show_plan_notification("MODELO DIFERENTE\nAL PLAN EN PROGRESO", raw, color="#FF3333")
             else:
                 # Error desconocido
                 if result < 0:
@@ -2606,7 +3222,7 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         finally:
             self._processing_scan = False
-            self._scan_in_progress = False  # 🔓 Desbloquear actualizaciones
+            self._scan_in_progress = False  # ðŸ”“ Desbloquear actualizaciones
     
     def _process_pending_barcode(self):
         if self._processing_scan:
@@ -2614,15 +3230,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if self._pending_barcode_processed:
             return
             
-        # 🔒 Bloquear actualizaciones durante el escaneo
+        # ðŸ”’ Bloquear actualizaciones durante el escaneo
         self._scan_in_progress = True
         
         raw = (self.scan_input.text() or '').strip()
         if not raw or is_complete_qr(raw):
             self._scan_in_progress = False  # Desbloquear
-            return  # Ya lo manejará el flujo normal (QR completo o vacío)
+            return  # Ya lo manejará el flujo normal (QR completo o vací­o)
         
-        # EVITAR DUPLICADOS - verificar si ya procesamos este código
+        # EVITAR DUPLICADOS - verificar si ya procesamos este cí³digo
         import time
         current_time = time.time() * 1000
         if raw == self._last_processed_code and (current_time - self._last_processed_time) < 500:
@@ -2630,7 +3246,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._scan_in_progress = False  # Desbloquear
             return
         
-        # Validar nuevamente heurística
+        # Validar nuevamente heurí­stica
         if len(raw) >= 13 and raw[-12:].isdigit() and raw.replace('_','').replace('-','').isalnum():
             # LIMPIAR PRIMERO
             self.scan_input.clear()
@@ -2643,13 +3259,13 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 selected_linea = self.linea_selector.currentText()
                 result = process_scan_direct(raw, selected_linea)
-                if result > 0:
-                    # ✅ Reproducir sonido de éxito
+                if result == 999999:  # PAR COMPLETO`n                # PAR COMPLETO - QR+BARCODE emparejados exitosamente`n                try:`n                    from ..services.parser import detect_scan_format`n                    scan_type = detect_scan_format(raw)`n                    self._add_scan_to_history(raw, scan_type, success=True, message="PAR COMPLETO")`n                except Exception as e:`n                    logger.debug(f"Error agregando a historial: {e}")`n                `n                # Actualizar timestamp para timer de inactividad`n                import time`n                self._last_scan_time_per_line[linea] = time.time()`n                `n                # Actualizar UI en background (no bloquea)`n                QtCore.QTimer.singleShot(50, lambda: self._update_ui_after_scan(raw, linea))`n                `n            elif result == -5:  # ESPERANDO PAR`n                # Primera parte del par - esperando complemento`n                try:`n                    from ..services.parser import detect_scan_format`n                    scan_type = detect_scan_format(raw)`n                    self._add_scan_to_history(raw, scan_type, success=True, message="Esperando par")`n                except Exception as e:`n                    logger.debug(f"Error agregando a historial: {e}")`n                `n                # Actualizar timestamp`n                import time`n                self._last_scan_time_per_line[linea] = time.time()`n                `n                # Actualizar UI`n                QtCore.QTimer.singleShot(50, lambda: self._update_ui_after_scan(raw, linea))`n                `n            elif result > 0:
+                    # … Reproducir sonido de í©xito
                     _play_success_sound()
                     
                     self._pending_barcode_processed = True
                     
-                    # ⚡ OPTIMIZACIÓN MÁXIMA: NO actualizar plan ni totales aquí
+                    #  OPTIMIZACIí“N MíXIMA: NO actualizar plan ni totales aquí­
                     # Solo mostrar overlay y actualizar contador en memoria (instantáneo)
                     self._show_ok_overlay("BARCODE")
                     
@@ -2664,18 +3280,18 @@ class MainWindow(QtWidgets.QMainWindow):
                     # Actualizar status con contador (no toca DB)
                     self.update_status_fast()
                     
-                    # ❌ ELIMINADO refresh_plan_only y refresh_totals_only (causaban congelamiento)
-                    # ✅ El timer de 15 SEGUNDOS se encarga de actualizar automáticamente (optimizado con Dual DB)
+                    # âŒ ELIMINADO refresh_plan_only y refresh_totals_only (causaban congelamiento)
+                    # … El timer de 15 SEGUNDOS se encarga de actualizar automáticamente (optimizado con Dual DB)
                     
-                    # Reset métricas de escritura tras procesar
+                    # Reset mí©tricas de escritura tras procesar
                     self._last_char_time = 0.0
                     self._interchar_times.clear()
                 elif result == 0:
-                    # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificación)
-                    logger.debug(f"🔇 Duplicado ignorado en UI (_process_pending_barcode): {raw[:30]}...")
+                    # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificacií³n)
+                    logger.debug(f"ðŸ”‡ Duplicado ignorado en UI (_process_pending_barcode): {raw[:30]}...")
                     self._last_char_time = 0.0
                     self._interchar_times.clear()
-                    pass  # No hacer nada, es normal en producción
+                    pass  # No hacer nada, es normal en produccií³n
                 elif result == -3:
                     _play_error_sound()
                     self._show_plan_notification("FUERA DE PLAN", raw, color="#991313")
@@ -2709,25 +3325,25 @@ class MainWindow(QtWidgets.QMainWindow):
                 elif result == -8:
                     # QR duplicado - verificar si es consecutivo
                     if raw == self._last_processed_code:
-                        logger.debug(f"🔇 QR duplicado consecutivo ignorado: {raw[:20]}...")
+                        logger.debug(f"ðŸ”‡ QR duplicado consecutivo ignorado: {raw[:20]}...")
                         return
                     # No es consecutivo - mostrar sin sonido
-                    self._show_plan_notification("❌ QR DUPLICADO\nEscanea BARCODE", raw, color="#FF3333")
+                    self._show_plan_notification("QR DUPLICADO\nEscanea BARCODE", raw, color="#FF3333")
                     self._last_char_time = 0.0
                     self._interchar_times.clear()
                 elif result == -9:
                     # BARCODE duplicado - verificar si es consecutivo
                     if raw == self._last_processed_code:
-                        logger.debug(f"🔇 BARCODE duplicado consecutivo ignorado: {raw[:20]}...")
+                        logger.debug(f"BARCODE duplicado consecutivo ignorado: {raw[:20]}...")
                         return
                     # No es consecutivo - mostrar sin sonido
-                    self._show_plan_notification("❌ BARCODE DUPLICADO\nEscanea QR", raw, color="#FF3333")
+                    self._show_plan_notification("BARCODE DUPLICADO\nEscanea QR", raw, color="#FF3333")
                     self._last_char_time = 0.0
                     self._interchar_times.clear()
                 elif result == -10:
                     # Modelo diferente al plan EN PROGRESO
                     _play_error_sound()
-                    self._show_plan_notification("❌ MODELO DIFERENTE", raw, color="#FF3333")
+                    self._show_plan_notification("MODELO DIFERENTE", raw, color="#FF3333")
                     self._last_char_time = 0.0
                     self._interchar_times.clear()
                 else:
@@ -2741,7 +3357,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
             finally:
                 self._processing_scan = False
-                self._scan_in_progress = False  # 🔓 Desbloquear actualizaciones
+                self._scan_in_progress = False  # ðŸ”“ Desbloquear actualizaciones
                 if not self.scan_input.text():
                     self._pending_barcode_processed = False
 
@@ -2749,10 +3365,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Reinicializar tabla del plan si es necesario (cambio de modo SUB ASSY)
         self._reinit_plan_table()
         
-        # Cargar datos del plan después de reinicializar
+        # Cargar datos del plan despuí©s de reinicializar
         self.refresh_plan_only()
         
-        # Últimos escaneos desde SQLite local (ultra-rápido)
+        # íšltimos escaneos desde SQLite local (ultra-rápido)
         scans = get_last_scans(100)
         self.table_scans.setRowCount(0)
         for s in scans:
@@ -2762,7 +3378,7 @@ class MainWindow(QtWidgets.QMainWindow):
             for col, v in enumerate(vals):
                 self.table_scans.setItem(row, col, QtWidgets.QTableWidgetItem(str(v)))
 
-        # Totales del día desde SQLite local (ultra-rápido)
+        # Totales del dí­a desde SQLite local (ultra-rápido)
         totals = get_today_totals()
         self.table_totals.setRowCount(0)
         for t in totals:
@@ -2779,10 +3395,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def update_status(self) -> None:
         qsize = self.db.queue_size()
         uph = getattr(self, "_last_total_uph_real", 0)
-        self.status.showMessage(f"MySQL conectado | UPH real última hora: {uph} | Cola offline: {qsize}")
+        self.status.showMessage(f"MySQL conectado | UPH real íºltima hora: {uph} | Cola offline: {qsize}")
 
     def update_status_only(self) -> None:
-        """Actualización rápida solo del status bar sin consultas pesadas"""
+        """Actualizacií³n rápida solo del status bar sin consultas pesadas"""
         try:
             qsize = self.db.queue_size()
             self.status.showMessage(f"MySQL conectado | Cola offline: {qsize}")
@@ -2790,38 +3406,38 @@ class MainWindow(QtWidgets.QMainWindow):
             self.status.showMessage(f"MySQL error: {str(e)[:50]}...")
     
     def _update_ui_throttled(self) -> None:
-        """Actualización de UI controlada para evitar sobrecarga durante escaneo constante"""
+        """Actualizacií³n de UI controlada para evitar sobrecarga durante escaneo constante"""
         import time
         current_time = time.time()
         if current_time - self._last_ui_update < self._ui_update_interval:
             return
         
         self._last_ui_update = current_time
-        # Refrescar también plan para ver producido y uph real sin esperar al timer
+        # Refrescar tambií©n plan para ver producido y uph real sin esperar al timer
         self.refresh_totals_only()
         self.refresh_plan_only()
         self.update_status_fast()
     
     def _update_tables_and_status(self) -> None:
         """Actualizar TODO en BACKGROUND thread (sin congelar UI)"""
-        # ✅ VERIFICAR CAMBIO DE FECHA (medianoche)
+        # … VERIFICAR CAMBIO DE FECHA (medianoche)
         from datetime import date
         today = date.today()
         if hasattr(self, '_current_date') and self._current_date != today:
-            logger.warning(f"CAMBIO DE FECHA DETECTADO: {self._current_date} → {today}")
+            logger.warning(f"CAMBIO DE FECHA DETECTADO: {self._current_date} â†’ {today}")
             self._current_date = today
             
-            # Forzar recarga completa del plan para el nuevo día
+            # Forzar recarga completa del plan para el nuevo dí­a
             QtCore.QTimer.singleShot(500, self._force_reload_plan_for_new_day)
             return  # Salir, la recarga se hará en el callback
         
-        # ✅ VERIFICAR CAMBIOS EN EL PLAN DESDE MYSQL (cada 15s el sync worker descarga nuevos datos)
+        # … VERIFICAR CAMBIOS EN EL PLAN DESDE MYSQL (cada 15s el sync worker descarga nuevos datos)
         from ..services.dual_db import get_dual_db
         dual_db = get_dual_db()
         if dual_db.check_plan_changed_and_reset():
-            logger.warning("📊 PLAN CAMBIÓ EN MYSQL - Recargando tabla automáticamente...")
+            logger.warning("ðŸ“Š PLAN CAMBIí“ EN MYSQL - Recargando tabla automáticamente...")
             QtCore.QTimer.singleShot(100, self._force_reload_plan_table)
-            # Mostrar notificación visual temporal
+            # Mostrar notificacií³n visual temporal
             if hasattr(self, 'fecha_plan_label'):
                 original_style = self.fecha_plan_label.styleSheet()
                 self.fecha_plan_label.setStyleSheet("""
@@ -2837,10 +3453,10 @@ class MainWindow(QtWidgets.QMainWindow):
                         margin: 4px 0px;
                     }
                 """)
-                # Restaurar estilo después de 2 segundos
+                # Restaurar estilo despuí©s de 2 segundos
                 QtCore.QTimer.singleShot(2000, lambda: self.fecha_plan_label.setStyleSheet(original_style))
         
-        # Si hay un escaneo en progreso, saltar actualización
+        # Si hay un escaneo en progreso, saltar actualizacií³n
         if getattr(self, '_scan_in_progress', False):
             return
         
@@ -2848,7 +3464,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if hasattr(self, '_update_worker') and self._update_worker and self._update_worker.isRunning():
             return
         
-        # ✅ Worker thread para leer datos en background
+        # … Worker thread para leer datos en background
         class UpdateWorker(QtCore.QThread):
             data_ready = QtCore.pyqtSignal(dict)
             
@@ -2865,7 +3481,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     with dual_db._get_sqlite_connection(timeout=1.0) as conn:
                         cursor = conn.cursor()
                         
-                        # 1. Métricas de cards
+                        # 1. Mí©tricas de cards
                         cursor.execute("""
                             SELECT SUM(plan_count), SUM(produced_count)
                             FROM plan_local
@@ -2892,7 +3508,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     
                 except Exception as e:
                     logger.error(f"Error en UpdateWorker: {e}")
-                    self.data_ready.emit({})  # Emitir dict vacío en caso de error
+                    self.data_ready.emit({})  # Emitir dict vací­o en caso de error
         
         # Crear y ejecutar worker
         linea_actual = self.linea_selector.currentText()
@@ -2906,46 +3522,49 @@ class MainWindow(QtWidgets.QMainWindow):
             if not data:
                 return
             
-            # Verificar que no cambió la línea mientras se cargaban datos
+            # Verificar que no cambií³ la lí­nea mientras se cargaban datos
             if data.get('linea') != self.linea_selector.currentText():
                 return
             
-            # ✅ ACTUALIZAR CARDS (instantáneo)
-            self._update_cards_with_metrics(
-                plan=data['plan_total'],
-                plan_acum=data['plan_total'],
-                produccion=data['produccion_total'],
-                eficiencia=data['eficiencia'],
-                uph=0,
-                upph=0.0
-            )
+            # âš ï¸ NO actualizar cards desde worker background - ahora usamos _update_plan_totals()
+            # que calcula correctamente el plan_acumulado basado en tiempo transcurrido
             
-            # ✅ ACTUALIZAR TABLA DE PLAN (si hay datos)
+            # Cí“DIGO VIEJO (DESHABILITADO):
+            # self._update_cards_with_metrics(
+            #     plan=data['plan_total'],
+            #     plan_acum=data['plan_total'],  # âŒ Este valor es INCORRECTO (siempre usa total)
+            #     produccion=data['produccion_total'],
+            #     eficiencia=data['eficiencia'],
+            #     uph=0,
+            #     upph=0.0
+            # )
+            
+            # … ACTUALIZAR TABLA DE PLAN (si hay datos)
             if data.get('plan_rows'):
                 QtCore.QTimer.singleShot(10, lambda: self._render_plan_table_fast(data['plan_rows']))
             
-            # ✅ Actualizar status bar
+            # … Actualizar status bar
             self.update_status()
             
-            # ✅ SINCRONIZAR VENTANA UPH (si está abierta)
+            # … SINCRONIZAR VENTANA UPH (si está abierta)
             self._sync_metrics_to_widget()
             
-            logger.debug(f"✅ Cards actualizadas: Plan={data['plan_total']}, Prod={data['produccion_total']}, Efic={data['eficiencia']:.1f}%")
+            logger.debug(f"… Cards actualizadas: Plan={data['plan_total']}, Prod={data['produccion_total']}, Efic={data['eficiencia']:.1f}%")
             
         except Exception as e:
-            logger.warning(f"⚠️ Error actualizando UI: {e}")
+            logger.warning(f"âš ï¸ Error actualizando UI: {e}")
     
     def _render_plan_table_fast(self, plan_rows: list):
         """Renderiza tabla de plan con datos YA preparados (sin consultas adicionales)"""
         try:
-            # ✅ DETECTAR CAMBIOS EN SECUENCIA: Si el orden cambió, re-renderizar completo
+            # … DETECTAR CAMBIOS EN SECUENCIA: Si el orden cambií³, re-renderizar completo
             if self.table_plan.rowCount() == len(plan_rows):
                 sequence_changed = False
                 for row_idx in range(self.table_plan.rowCount()):
                     part_no_item = self.table_plan.item(row_idx, 0)
                     if part_no_item:
                         plan_id_stored = part_no_item.data(QtCore.Qt.ItemDataRole.UserRole)
-                        # El plan en esta posición debería ser el mismo si no cambió el orden
+                        # El plan en esta posicií³n deberí­a ser el mismo si no cambií³ el orden
                         if row_idx < len(plan_rows):
                             expected_id = plan_rows[row_idx].get('id')
                             if plan_id_stored != expected_id:
@@ -2956,19 +3575,19 @@ class MainWindow(QtWidgets.QMainWindow):
                     self._force_reload_plan_table()
                     return
             
-            # Actualizar valores de producción en las celdas existentes
+            # Actualizar valores de produccií³n en las celdas existentes
             for row_idx in range(self.table_plan.rowCount()):
                 part_no_item = self.table_plan.item(row_idx, 0)
                 if not part_no_item:
                     continue
                 
-                # Obtener plan_id almacenado en la celda (identificador único)
+                # Obtener plan_id almacenado en la celda (identificador íºnico)
                 plan_id_stored = part_no_item.data(QtCore.Qt.ItemDataRole.UserRole)
                 
                 if plan_id_stored is None:
                     continue
                 
-                # Buscar el plan correspondiente por ID único (no por part_no)
+                # Buscar el plan correspondiente por ID íºnico (no por part_no)
                 for plan in plan_rows:
                     if plan.get('id') == plan_id_stored:
                         # Actualizar columna de "Plan" (plan_count)
@@ -3011,23 +3630,23 @@ class MainWindow(QtWidgets.QMainWindow):
                             uph_target = plan.get('uph', 0)
                             uph_item.setText(str(uph_target))
                         
-                        # Actualizar también el estado si cambió
+                        # Actualizar tambií©n el estado si cambií³
                         estado_nuevo = plan.get('status', '')
                         col_estado = 8 if self.table_plan.columnCount() == 10 else 7
                         estado_item = self.table_plan.item(row_idx, col_estado)
                         if estado_item:
                             estado_item.setText(estado_nuevo)
                         
-                        # Actualizar botón TERMINAR según el nuevo estado
+                        # Actualizar botí³n TERMINAR segíºn el nuevo estado
                         col_acciones = 9 if self.table_plan.columnCount() == 10 else 8
                         estado_upper = estado_nuevo.upper()
                         
-                        # Verificar si debe tener botón TERMINAR
+                        # Verificar si debe tener botí³n TERMINAR
                         debe_tener_boton = 'PROGRESO' in estado_upper or 'PAUSADO' in estado_upper
                         tiene_boton = self.table_plan.cellWidget(row_idx, col_acciones) is not None
                         
                         if debe_tener_boton and not tiene_boton:
-                            # Agregar botón TERMINAR
+                            # Agregar botí³n TERMINAR
                             btn_terminar = QtWidgets.QPushButton("TERMINAR")
                             btn_terminar.setStyleSheet("""
                                 QPushButton {
@@ -3056,7 +3675,7 @@ class MainWindow(QtWidgets.QMainWindow):
                             )
                             self.table_plan.setCellWidget(row_idx, col_acciones, btn_terminar)
                         elif not debe_tener_boton and tiene_boton:
-                            # Remover botón TERMINAR
+                            # Remover botí³n TERMINAR
                             self.table_plan.setCellWidget(row_idx, col_acciones, None)
                         
                         break
@@ -3064,7 +3683,7 @@ class MainWindow(QtWidgets.QMainWindow):
             # Forzar refresco visual de la tabla completa
             self.table_plan.viewport().repaint()
             
-            logger.debug(f"✅ Tabla de plan actualizada (solo valores producidos y estado)")
+            logger.debug(f"… Tabla de plan actualizada (solo valores producidos y estado)")
             
         except Exception as e:
             logger.debug(f"Error renderizando tabla rápida: {e}")
@@ -3090,14 +3709,14 @@ class MainWindow(QtWidgets.QMainWindow):
     def _force_reload_plan_for_new_day(self) -> None:
         """Fuerza recarga completa del plan cuando detecta cambio de fecha (medianoche)"""
         try:
-            logger.info("📅 Recargando plan para nuevo día...")
+            logger.info("ðŸ“… Recargando plan para nuevo dí­a...")
             
-            # ✅ ACTUALIZAR INDICADOR VISUAL DE FECHA
+            # … ACTUALIZAR INDICADOR VISUAL DE FECHA
             from datetime import date
             fecha_hoy = date.today().strftime("%d/%m/%Y")
             if hasattr(self, 'fecha_plan_label'):
-                self.fecha_plan_label.setText(f"PLAN DEL DÍA: {fecha_hoy}")
-                # Animación visual: cambiar color temporalmente para llamar la atención
+                self.fecha_plan_label.setText(f"PLAN DEL DíA: {fecha_hoy}")
+                # Animacií³n visual: cambiar color temporalmente para llamar la atencií³n
                 self.fecha_plan_label.setStyleSheet("""
                     QLabel {
                         background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -3111,7 +3730,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         margin: 4px 0px;
                     }
                 """)
-                # Volver al color normal después de 3 segundos
+                # Volver al color normal despuí©s de 3 segundos
                 QtCore.QTimer.singleShot(3000, lambda: self.fecha_plan_label.setStyleSheet("""
                     QLabel {
                         background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -3126,34 +3745,34 @@ class MainWindow(QtWidgets.QMainWindow):
                     }
                 """))
             
-            # Forzar sincronización desde MySQL para obtener plan del día actual
+            # Forzar sincronizacií³n desde MySQL para obtener plan del dí­a actual
             from ..services.dual_db import get_dual_db
             dual_db = get_dual_db()
             
-            # Trigger manual de sincronización de plan
+            # Trigger manual de sincronizacií³n de plan
             if hasattr(dual_db, '_sync_worker') and dual_db._sync_worker:
                 # Forzar sync inmediato
                 dual_db._sync_worker._sync_plan_from_mysql()
-                logger.info("✅ Sync de plan forzado para nuevo día")
+                logger.info("… Sync de plan forzado para nuevo dí­a")
             
-            # Esperar un momento para que se complete la sincronización
+            # Esperar un momento para que se complete la sincronizacií³n
             QtCore.QTimer.singleShot(1000, lambda: self._force_reload_plan_table())
             
-            # Mostrar notificación al usuario
+            # Mostrar notificacií³n al usuario
             if hasattr(self, 'status'):
-                self.status.showMessage("Plan actualizado para nuevo día", 5000)
+                self.status.showMessage("Plan actualizado para nuevo dí­a", 5000)
             
         except Exception as e:
-            logger.error(f"❌ Error recargando plan para nuevo día: {e}")
+            logger.error(f"âŒ Error recargando plan para nuevo dí­a: {e}")
     
     def _force_refresh(self) -> None:
-        """Forzar actualización manual de todas las tablas y métricas
+        """Forzar actualizacií³n manual de todas las tablas y mí©tricas
         
-        Este método se llama cuando el usuario presiona el botón 'Actualizar'.
-        Realiza una actualización completa inmediata sin esperar el timer automático.
+        Este mí©todo se llama cuando el usuario presiona el botí³n 'Actualizar'.
+        Realiza una actualizacií³n completa inmediata sin esperar el timer automático.
         """
         try:
-            # Deshabilitar botón temporalmente para evitar clicks múltiples
+            # Deshabilitar botí³n temporalmente para evitar clicks míºltiples
             if hasattr(self, 'refresh_button'):
                 self.refresh_button.setEnabled(False)
                 self.refresh_button.setText("Actualizando...")
@@ -3163,56 +3782,56 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._uph_cache.clear()
                 self._uph_cache_time.clear()
             
-            # Actualizar todas las tablas y métricas
+            # Actualizar todas las tablas y mí©tricas
             self._update_tables_and_status()
             
-            # Mensaje de confirmación
+            # Mensaje de confirmacií³n
             if hasattr(self, 'status'):
-                self.status.showMessage("Actualización completada", 3000)
+                self.status.showMessage("Actualizacií³n completada", 3000)
             
-            # Log de la acción
+            # Log de la accií³n
             import logging
             logger = logging.getLogger(__name__)
-            logger.info("Actualización manual forzada por el usuario")
+            logger.info("Actualizacií³n manual forzada por el usuario")
             
         except Exception as e:
             # Manejo de errores
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"❌ Error en actualización manual: {e}")
+            logger.error(f"âŒ Error en actualizacií³n manual: {e}")
             
             if hasattr(self, 'status'):
-                self.status.showMessage(f"❌ Error al actualizar: {str(e)[:50]}", 5000)
+                self.status.showMessage(f"âŒ Error al actualizar: {str(e)[:50]}", 5000)
         
         finally:
-            # Re-habilitar botón después de 2 segundos
+            # Re-habilitar botí³n despuí©s de 2 segundos
             if hasattr(self, 'refresh_button'):
                 QtCore.QTimer.singleShot(2000, lambda: self._re_enable_refresh_button())
     
     def _re_enable_refresh_button(self):
-        """Re-habilitar el botón de actualizar"""
+        """Re-habilitar el botí³n de actualizar"""
         if hasattr(self, 'refresh_button'):
             self.refresh_button.setEnabled(True)
             self.refresh_button.setText("Actualizar")
     
     def _toggle_metrics_widget(self):
-        """Abrir/cerrar ventana flotante de métricas"""
+        """Abrir/cerrar ventana flotante de mí©tricas"""
         try:
             if self.metrics_widget is None or not self.metrics_widget.isVisible():
                 # Crear o mostrar la ventana
                 if self.metrics_widget is None:
                     self.metrics_widget = MetricsWidget(self)
-                    logger.info("🪟 Creada ventana flotante de métricas")
+                    logger.info("ðŸªŸ Creada ventana flotante de mí©tricas")
                 
                 # Mostrar la ventana primero
                 self.metrics_widget.show()
                 self.metrics_widget.raise_()
                 self.metrics_widget.activateWindow()
                 
-                # Actualizar con los valores actuales DESPUÉS de mostrarla
+                # Actualizar con los valores actuales DESPUí‰S de mostrarla
                 self._sync_metrics_to_widget()
                 
-                # Actualizar texto del botón
+                # Actualizar texto del botí³n
                 self.float_metrics_button.setText("CERRAR UPHS")
                 self.float_metrics_button.setStyleSheet("""
                     QPushButton {
@@ -3232,13 +3851,13 @@ class MainWindow(QtWidgets.QMainWindow):
                     }
                 """)
                 
-                logger.info("🪟 Ventana flotante de métricas mostrada")
+                logger.info("ðŸªŸ Ventana flotante de mí©tricas mostrada")
             else:
                 # Cerrar la ventana
                 self.metrics_widget.close()
                 self.metrics_widget = None
                 
-                # Restaurar texto del botón
+                # Restaurar texto del botí³n
                 self.float_metrics_button.setText("UPHS")
                 self.float_metrics_button.setStyleSheet("""
                     QPushButton {
@@ -3258,23 +3877,23 @@ class MainWindow(QtWidgets.QMainWindow):
                     }
                 """)
                 
-                logger.info("🪟 Ventana flotante de métricas cerrada")
+                logger.info("ðŸªŸ Ventana flotante de mí©tricas cerrada")
         
         except Exception as e:
-            logger.error(f"❌ Error al toggle ventana flotante: {e}")
+            logger.error(f"âŒ Error al toggle ventana flotante: {e}")
             import traceback
             traceback.print_exc()
     
     def _sync_metrics_to_widget(self):
-        """Sincronizar métricas actuales con la ventana flotante"""
+        """Sincronizar mí©tricas actuales con la ventana flotante"""
         if self.metrics_widget is None or not self.metrics_widget.isVisible():
             return
         
         try:
-            # Obtener línea seleccionada
+            # Obtener lí­nea seleccionada
             linea_seleccionada = self.linea_selector.currentText()
             
-            # Crear diccionario de métricas desde los value_label de las cards
+            # Crear diccionario de mí©tricas desde los value_label de las cards
             metrics = {
                 'plan': self.card_plan.value_label.text() if hasattr(self.card_plan, 'value_label') else '0',
                 'plan_acum': self.card_resultado.value_label.text() if hasattr(self.card_resultado, 'value_label') else '0',
@@ -3288,18 +3907,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self.metrics_widget.update_metrics(metrics, linea_seleccionada)
             
         except Exception as e:
-            logger.error(f"❌ Error al sincronizar métricas: {e}")
+            logger.error(f"âŒ Error al sincronizar mí©tricas: {e}")
     
     def update_status_fast(self) -> None:
-        """Actualización ultra-rápida del status SIN tocar DB (solo memoria)"""
+        """Actualizacií³n ultra-rápida del status SIN tocar DB (solo memoria)"""
         try:
             # Obtener contador en memoria (instantáneo)
             scan_count = getattr(self, '_scan_counter', 0)
             
-            # Obtener línea actual
+            # Obtener lí­nea actual
             selected_linea = self.linea_selector.currentText() if hasattr(self, 'linea_selector') else "N/A"
             
-            # Actualizar información del sistema directo
+            # Actualizar informacií³n del sistema directo
             direct_mysql = get_direct_mysql()
             
             # Status rápido sin bloquear (no intenta conectar si está en ventana offline)
@@ -3307,11 +3926,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 sync_status = "Conectado"
                 status_color = "#00aa00"
                 # Mostrar contador en memoria (instantáneo, no DB)
-                self.status.showMessage(f"MySQL Directo | {sync_status} | Línea: {selected_linea} | Scans: {scan_count} (memoria)")
+                self.status.showMessage(f"MySQL Directo | {sync_status} | Lí­nea: {selected_linea} | Scans: {scan_count} (memoria)")
             else:
                 sync_status = "Desconectado"
                 status_color = "#aa0000"
-                self.status.showMessage(f"Sistema | {sync_status} | Línea: {selected_linea} | Scans: {scan_count} (memoria)")
+                self.status.showMessage(f"Sistema | {sync_status} | Lí­nea: {selected_linea} | Scans: {scan_count} (memoria)")
             
             # Actualizar indicador compacto
             if hasattr(self, 'status_dual'):
@@ -3325,15 +3944,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.status_dual.setStyleSheet("color: #aa0000; font-size: 11px;")
 
     def force_table_refresh(self):
-        """Fuerza el refresh completo de las tablas tras cambio de configuración"""
+        """Fuerza el refresh completo de las tablas tras cambio de configuracií³n"""
         try:
             # Usar logging básico si el personalizado falla
             try:
                 from ..logging_config import get_logger
                 logger = get_logger(__name__)
-                logger.info("Forzando refresh de tablas tras cambio de configuración")
+                logger.info("Forzando refresh de tablas tras cambio de configuracií³n")
             except (ImportError, Exception):
-                print("Forzando refresh de tablas tras cambio de configuración")
+                print("Forzando refresh de tablas tras cambio de configuracií³n")
             
             # Leer valores actualizados directamente del .env y actualizar settings
             from pathlib import Path
@@ -3367,7 +3986,7 @@ class MainWindow(QtWidgets.QMainWindow):
             sub_assy_mode = getattr(settings, 'SUB_ASSY_MODE', False)
             app_mode = getattr(settings, 'APP_MODE', 'ASSY')
             
-            # ⚡ SIN UPH Real/Proy/CT: 10 columnas SUB ASSY, 9 normal
+            #  SIN UPH Real/Proy/CT: 10 columnas SUB ASSY, 9 normal
             num_columns = 10 if (sub_assy_mode and app_mode.upper() == 'ASSY') else 9
             current_columns = self.table_plan.columnCount()
             
@@ -3375,12 +3994,12 @@ class MainWindow(QtWidgets.QMainWindow):
             print(f"_reinit_plan_table: SUB_ASSY_MODE={sub_assy_mode}, APP_MODE={app_mode}")
             print(f"_reinit_plan_table: Cambiando de {current_columns} a {num_columns} columnas")
             
-            # FORZAR recreación completa de la tabla
+            # FORZAR recreacií³n completa de la tabla
             self.table_plan.clear()
             self.table_plan.setRowCount(0)
             self.table_plan.setColumnCount(num_columns)
             
-            # Headers dinámicos según modo SUB ASSY - ⚡ SIN UPH Real/Proy/CT
+            # Headers dinámicos segíºn modo SUB ASSY -  SIN UPH Real/Proy/CT
             if num_columns == 10:  # SUB ASSY
                 headers = ["Part No", "Lote", "Modelo", "SUB ASSY", "Plan", "Producido", "% Avance", "UPH Target", "Estado", "Acciones"]
             else:  # Normal (9 columnas)
@@ -3389,13 +4008,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.table_plan.setHorizontalHeaderLabels(headers)
             self.table_plan.horizontalHeader().setStretchLastSection(True)
             
-            # Reajustar tamaños de columnas
+            # Reajustar tamaí±os de columnas
             plan_header = self.table_plan.horizontalHeader()
             plan_header.resizeSection(0, 120)  # Part No
             plan_header.resizeSection(1, 90)   # Lote
             plan_header.resizeSection(2, 100)  # Modelo
             
-            if num_columns == 10:  # Modo SUB ASSY - ⚡ SIN UPH Real/Proy/CT
+            if num_columns == 10:  # Modo SUB ASSY -  SIN UPH Real/Proy/CT
                 plan_header.resizeSection(3, 80)   # SUB ASSY
                 plan_header.resizeSection(4, 60)   # Plan
                 plan_header.resizeSection(5, 70)   # Producido
@@ -3403,7 +4022,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 plan_header.resizeSection(7, 70)   # UPH Target
                 plan_header.resizeSection(8, 80)   # Estado
                 plan_header.resizeSection(9, 100)  # Acciones
-            else:  # Modo normal (9 columnas) - ⚡ SIN UPH Real/Proy/CT
+            else:  # Modo normal (9 columnas) -  SIN UPH Real/Proy/CT
                 plan_header.resizeSection(3, 60)   # Plan
                 plan_header.resizeSection(4, 70)   # Producido
                 plan_header.resizeSection(5, 70)   # % Avance
@@ -3421,23 +4040,23 @@ class MainWindow(QtWidgets.QMainWindow):
     def refresh_totals_only(self) -> None:
         """
         Actualiza cards usando SOLO SQLite local (instantáneo) - MySQL se sincroniza en background
-        ✅ ULTRA RÁPIDO: Lee de SQLite local (< 1ms)
-        ✅ NO BLOQUEA: Sincronización con MySQL es automática en background
-        ✅ MEJOR UX: Actualización instantánea sin esperas
+        … ULTRA RíPIDO: Lee de SQLite local (< 1ms)
+        … NO BLOQUEA: Sincronizacií³n con MySQL es automática en background
+        … MEJOR UX: Actualizacií³n instantánea sin esperas
         """
         try:
-            # Si hay un escaneo en progreso, saltar actualización para no interferir
+            # Si hay un escaneo en progreso, saltar actualizacií³n para no interferir
             if getattr(self, '_scan_in_progress', False):
-                logger.debug("⏭️ Actualización de totales saltada: escaneo en progreso")
+                logger.debug("â­ï¸ Actualizacií³n de totales saltada: escaneo en progreso")
                 return
             
-            # ✅ OPTIMIZACIÓN: Leer directamente de SQLite local (instantáneo, < 1ms)
+            # … OPTIMIZACIí“N: Leer directamente de SQLite local (instantáneo, < 1ms)
             # NO necesitamos worker thread porque SQLite local es ultra rápido
             from ..services.dual_db import get_dual_db
             
             dual_db = get_dual_db()
             
-            # ✅ Lectura INSTANTÁNEA de SQLite local (no toca MySQL)
+            # … Lectura INSTANTíNEA de SQLite local (no toca MySQL)
             totals_dict = dual_db.get_local_totals()
             
             # Resetear contador en memoria
@@ -3446,7 +4065,7 @@ class MainWindow(QtWidgets.QMainWindow):
             # Limpiar tabla
             self.table_totals.setRowCount(0)
             
-            # Mostrar totales por línea
+            # Mostrar totales por lí­nea
             for linea in self._get_line_options():
                 if linea in totals_dict:
                     linea_data = totals_dict[linea]
@@ -3475,20 +4094,20 @@ class MainWindow(QtWidgets.QMainWindow):
             # Actualizar status con totales locales
             self._last_total_uph_real = total_cantidad
             
-            # Estado de sincronización (worker en background)
+            # Estado de sincronizacií³n (worker en background)
             sync_status = "Sync OK" if dual_db._sync_worker.is_alive() else "Sync Error"
             
-            # ✅ Mostrar que estamos usando caché local ultra rápido
-            self.status.showMessage(f"⚡ SQLite Local (instantáneo) | {sync_status} | Total: {total_cantidad}")
+            # … Mostrar que estamos usando cachí© local ultra rápido
+            self.status.showMessage(f" SQLite Local (instantáneo) | {sync_status} | Total: {total_cantidad}")
             
-            # ✅ ACTUALIZAR CARDS DE MÉTRICAS (Plan, Eficiencia, UPH, etc.)
+            # … ACTUALIZAR CARDS DE Mí‰TRICAS (Plan, Eficiencia, UPH, etc.)
             # Esto actualiza las 6 cards principales cada 15 segundos
             try:
-                self.update_status_fast()  # Actualiza cards desde caché de métricas
+                self.update_status_fast()  # Actualiza cards desde cachí© de mí©tricas
             except Exception as card_error:
-                logger.debug(f"⚠️ No se pudo actualizar cards de métricas: {card_error}")
+                logger.debug(f"âš ï¸ No se pudo actualizar cards de mí©tricas: {card_error}")
             
-            logger.debug(f"✅ Tabla y cards actualizadas desde SQLite local: {total_cantidad} piezas")
+            logger.debug(f"… Tabla y cards actualizadas desde SQLite local: {total_cantidad} piezas")
             
         except Exception as e:
             logger.error(f"Error actualizando totales desde SQLite local: {e}")
@@ -3496,7 +4115,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._fallback_totals_update(e)
     
     def _fallback_totals_update(self, error: Exception):
-        """Actualización de emergencia usando MySQL directo"""
+        """Actualizacií³n de emergencia usando MySQL directo"""
         try:
             logger.warning(f"Usando fallback MySQL para totales debido a: {error}")
             totals = get_today_totals()
@@ -3515,64 +4134,64 @@ class MainWindow(QtWidgets.QMainWindow):
             self.status.showMessage(f"Error total: {str(error)[:50]}...")
 
     def _refresh_plan_from_cache_only(self) -> None:
-        """⚡ ULTRA RÁPIDO: Actualiza tabla de plan SOLO desde caché (0ms, sin BD)"""
+        """ ULTRA RíPIDO: Actualiza tabla de plan SOLO desde cachí© (0ms, sin BD)"""
         try:
             from ..services.dual_db import get_dual_db
             dual_db = get_dual_db()
             
-            # Obtener línea actual
+            # Obtener lí­nea actual
             linea = self.linea_selector.currentText()
             
-            # ⚡ Leer directamente del caché en memoria (sin BD)
+            #  Leer directamente del cachí© en memoria (sin BD)
             if not hasattr(dual_db, '_plan_cache') or not dual_db._plan_cache:
-                return  # Caché vacío, no hacer nada
+                return  # Cachí© vací­o, no hacer nada
             
-            # Filtrar planes de la línea actual desde caché
+            # Filtrar planes de la lí­nea actual desde cachí©
             plan_rows = [
                 plan for plan in dual_db._plan_cache 
                 if plan.get('line') == linea
             ]
             
-            # Renderizar directamente (método interno que ya existe)
+            # Renderizar directamente (mí©todo interno que ya existe)
             self._on_plan_data_ready(linea, plan_rows, {})
             
         except Exception as e:
-            logger.debug(f"Error refrescando desde caché: {e}")
+            logger.debug(f"Error refrescando desde cachí©: {e}")
 
     def refresh_plan_only(self, force=False) -> None:
         """Lanza un worker en background para obtener datos y renderizar cuando termine - OPTIMIZADO"""
         try:
-            # ✅ Si hay un escaneo en progreso, saltar actualización para no interferir
+            # … Si hay un escaneo en progreso, saltar actualizacií³n para no interferir
             if not force and getattr(self, '_scan_in_progress', False):
-                logger.debug("⏭️ Actualización de plan saltada: escaneo en progreso")
+                logger.debug("â­ï¸ Actualizacií³n de plan saltada: escaneo en progreso")
                 return
                 
-            # ✅ Rate limiting MODERADO para evitar actualizaciones excesivas
+            # … Rate limiting MODERADO para evitar actualizaciones excesivas
             import time
             if not hasattr(self, '_last_refresh_time'):
                 self._last_refresh_time = 0
             current_time = time.time()
             
-            # ✅ Intervalo mínimo de 5 segundos entre actualizaciones
+            # … Intervalo mí­nimo de 5 segundos entre actualizaciones
             # Con Dual DB optimizado, 5s es suficiente para prevenir sobrecarga
-            min_interval = 5.0  # 5 segundos mínimo entre actualizaciones (optimizado con Dual DB)
+            min_interval = 5.0  # 5 segundos mí­nimo entre actualizaciones (optimizado con Dual DB)
             
             if not force and current_time - self._last_refresh_time < min_interval:
-                logger.debug(f"⏭️ Actualización de plan saltada: muy reciente ({current_time - self._last_refresh_time:.1f}s < {min_interval}s)")
+                logger.debug(f"â­ï¸ Actualizacií³n de plan saltada: muy reciente ({current_time - self._last_refresh_time:.1f}s < {min_interval}s)")
                 return
             
             self._last_refresh_time = current_time
 
-            # ✅ Si hay un worker ya corriendo, NO iniciar otro (previene acumulación)
+            # … Si hay un worker ya corriendo, NO iniciar otro (previene acumulacií³n)
             if getattr(self, '_plan_worker', None) and self._plan_worker.isRunning():
                 if force:
                     # Esperar un poco a que termine el worker actual
                     self._plan_worker.wait(100)  # Esperar máximo 100ms
                     if self._plan_worker.isRunning():
-                        logger.debug("⏭️ Worker de plan aún corriendo, saltando actualización")
+                        logger.debug("â­ï¸ Worker de plan aíºn corriendo, saltando actualizacií³n")
                         return
                 else:
-                    logger.debug("⏭️ Worker de plan ya en ejecución, saltando")
+                    logger.debug("â­ï¸ Worker de plan ya en ejecucií³n, saltando")
                     return
 
             linea = self.linea_selector.currentText()
@@ -3593,14 +4212,14 @@ class MainWindow(QtWidgets.QMainWindow):
                             uph_map = {}
                         self.data_ready.emit(self._linea, plan_rows, uph_map)
                     except Exception as e:
-                        # En caso de error, emitir lista vacía para no bloquear
+                        # En caso de error, emitir lista vací­a para no bloquear
                         logger.debug(f"Error en PlanFetchWorker: {e}")
                         self.data_ready.emit(self._linea, [], {})
 
             self._plan_worker = PlanFetchWorker(linea, self)
             self._plan_worker.data_ready.connect(self._on_plan_data_ready)
             self._plan_worker.start()
-            logger.debug(f"✅ Worker de plan iniciado para línea: {linea}")
+            logger.debug(f"… Worker de plan iniciado para lí­nea: {linea}")
         except Exception as e:
             import logging
             logging.error(f"Error en refresh_plan_only: {e}")
@@ -3608,12 +4227,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_plan_data_ready(self, linea: str, plan_rows, uph_proj_map: dict) -> None:
         """Renderiza la tabla de plan con datos obtenidos en background."""
         try:
-            # Si el usuario cambió la línea mientras cargábamos, ignorar
+            # Si el usuario cambií³ la lí­nea mientras cargábamos, ignorar
             if linea != self.linea_selector.currentText():
                 return
             self.table_plan.setRowCount(0)
             self.uph_proj_map = uph_proj_map or {}
-            # Definición local del widget de progreso
+            # Definicií³n local del widget de progreso
             class _PlanProgressBar(QtWidgets.QWidget):
                 def __init__(self, percent: float, projected: float|None=None, parent=None):
                     super().__init__(parent)
@@ -3670,7 +4289,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 prod = r.get('produced_count') or 0
                 percent_val = (prod/plan*100) if plan > 0 else 0
                 nparte = r.get('part_no','')
-                plan_id = r.get('id')  # ID único del plan para operaciones
+                plan_id = r.get('id')  # ID íºnico del plan para operaciones
                 estado = r.get('status') or ''
                 uph_target_raw = r.get('uph')
                 try:
@@ -3696,13 +4315,13 @@ class MainWindow(QtWidgets.QMainWindow):
                         sub_assy_info = self._get_sub_assy_info(nparte)
                     except Exception:
                         sub_assy_info = "Error SUB ASSY"
-                    # ⚡ SIN UPH Real/Proy/CT - Solo: Part No, Lote, Modelo, SUB ASSY, Plan, Producido, % Avance, UPH Target, Estado, Acciones
+                    #  SIN UPH Real/Proy/CT - Solo: Part No, Lote, Modelo, SUB ASSY, Plan, Producido, % Avance, UPH Target, Estado, Acciones
                     vals = [nparte, r.get('lot_no',''), r.get('model_code',''), sub_assy_info,
                             plan, prod, '', uph_target, estado, '']
                     progress_col = 6
                     acciones_col = 9
                 else:
-                    # ⚡ SIN UPH Real/Proy/CT - Solo: Part No, Lote, Modelo, Plan, Producido, % Avance, UPH Target, Estado, Acciones
+                    #  SIN UPH Real/Proy/CT - Solo: Part No, Lote, Modelo, Plan, Producido, % Avance, UPH Target, Estado, Acciones
                     vals = [nparte, r.get('lot_no',''), r.get('model_code',''),
                             plan, prod, '', uph_target, estado, '']
                     progress_col = 5
@@ -3712,7 +4331,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         self.table_plan.setCellWidget(row, col, build_progress(percent_val))
                         continue
                     elif col == acciones_col:
-                        # Crear botón TERMINAR si está EN PROGRESO o PAUSADO
+                        # Crear botí³n TERMINAR si está EN PROGRESO o PAUSADO
                         estado_upper = estado.upper()
                         if 'PROGRESO' in estado_upper or 'PAUSADO' in estado_upper:
                             btn_terminar = QtWidgets.QPushButton("TERMINAR")
@@ -3740,12 +4359,12 @@ class MainWindow(QtWidgets.QMainWindow):
                             self.table_plan.setCellWidget(row, col, btn_terminar)
                         continue
                     item = QtWidgets.QTableWidgetItem(str(v))
-                    # ⚡ Almacenar plan_id en la columna 0 (Part No) para identificación única
+                    #  Almacenar plan_id en la columna 0 (Part No) para identificacií³n íºnica
                     if col == 0:
                         item.setData(QtCore.Qt.ItemDataRole.UserRole, plan_id)
-                    # ⚡ SIN coloreo UPH Real (columna eliminada)
+                    #  SIN coloreo UPH Real (columna eliminada)
                     self.table_plan.setItem(row, col, item)
-            # Totales / métricas
+            # Totales / mí©tricas
             self._update_plan_totals(plan_rows or [])
             self._sync_metrics_to_widget()
         except Exception as e:
@@ -3753,7 +4372,7 @@ class MainWindow(QtWidgets.QMainWindow):
             logging.error(f"Error renderizando plan (worker): {e}")
 
     def _get_sub_assy_info(self, nparte: str) -> str:
-        """Obtiene información SUB ASSY desde el cache del sistema dual (muy rápido)"""
+        """Obtiene informacií³n SUB ASSY desde el cache del sistema dual (muy rápido)"""
         try:
             from ..services.dual_db import get_dual_db
             
@@ -3768,7 +4387,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_single_plan_row(self, nparte: str, linea: str) -> None:
         """Actualiza solo la fila del plan correspondiente al nparte escaneado (ultra-rápido)"""
         try:
-            # Solo actualizar si la línea actual coincide
+            # Solo actualizar si la lí­nea actual coincide
             if linea != self.linea_selector.currentText():
                 return
             
@@ -3793,7 +4412,7 @@ class MainWindow(QtWidgets.QMainWindow):
             from datetime import date
             today = date.today().isoformat()
             
-            # ⚡ USAR LOCK GLOBAL para evitar "database is locked"
+            #  USAR LOCK GLOBAL para evitar "database is locked"
             with dual_db._sqlite_lock:
                 with sqlite3.connect(dual_db.sqlite_path, timeout=5.0) as conn:
                     conn.execute("PRAGMA busy_timeout=5000")
@@ -3815,7 +4434,7 @@ class MainWindow(QtWidgets.QMainWindow):
             plan = row_data['plan_count'] or 0
             percent_val = (produced / plan * 100) if plan > 0 else 0
             
-            # Determinar columna de Producido según modo SUB ASSY
+            # Determinar columna de Producido segíºn modo SUB ASSY
             sub_assy_mode = getattr(settings, 'SUB_ASSY_MODE', False)
             app_mode = getattr(settings, 'APP_MODE', 'ASSY')
             show_sub_assy = (sub_assy_mode and app_mode.upper() == 'ASSY')
@@ -3887,7 +4506,7 @@ class MainWindow(QtWidgets.QMainWindow):
             progress_widget = _PlanProgressBar(percent_val)
             self.table_plan.setCellWidget(row_to_update, avance_col, progress_widget)
             
-            logger.debug(f"✅ Fila del plan actualizada: {nparte} → Producido: {produced}/{plan} ({percent_val:.1f}%)")
+            logger.debug(f"… Fila del plan actualizada: {nparte} â†’ Producido: {produced}/{plan} ({percent_val:.1f}%)")
             
         except Exception as e:
             logger.debug(f"Error actualizando fila del plan: {e}")
@@ -3915,39 +4534,39 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
     def configure_db_location(self) -> None:
-        """Configurar la ubicación de la base de datos local SQLite"""
+        """Configurar la ubicacií³n de la base de datos local SQLite"""
         try:
             import os
             
-            # Método deshabilitado - sistema optimizado usa solo MySQL directo
+            # Mí©todo deshabilitado - sistema optimizado usa solo MySQL directo
             QtWidgets.QMessageBox.information(
                 self,
-                "Configuración no disponible",
-                "El sistema optimizado usa MySQL directo.\nNo requiere configuración de base de datos local."
+                "Configuracií³n no disponible",
+                "El sistema optimizado usa MySQL directo.\nNo requiere configuracií³n de base de datos local."
             )
             return
             
-            # Código legacy comentado:
+            # Cí³digo legacy comentado:
             # dual_db = get_dual_db()
             # current_path = dual_db.sqlite_path
             current_dir = os.path.dirname(current_path)
             
-            # Diálogo de información actual
-            current_info = f"Ubicación actual: {current_path}\nTamaño: {self._get_db_size(current_path)}"
+            # Diálogo de informacií³n actual
+            current_info = f"Ubicacií³n actual: {current_path}\nTamaí±o: {self._get_db_size(current_path)}"
             
             reply = QtWidgets.QMessageBox.question(
                 self,
                 "Configurar Base de Datos Local",
-                f"{current_info}\n\n¿Desea cambiar la ubicación de la base de datos SQLite local?",
+                f"{current_info}\n\nÂ¿Desea cambiar la ubicacií³n de la base de datos SQLite local?",
                 QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
                 QtWidgets.QMessageBox.StandardButton.No
             )
             
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-                # Selector de nueva ubicación
+                # Selector de nueva ubicacií³n
                 new_dir = QtWidgets.QFileDialog.getExistingDirectory(
                     self,
-                    "Seleccionar nueva ubicación para base de datos local",
+                    "Seleccionar nueva ubicacií³n para base de datos local",
                     current_dir
                 )
                 
@@ -3958,7 +4577,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     confirm = QtWidgets.QMessageBox.question(
                         self,
                         "Confirmar cambio",
-                        f"Nueva ubicación: {new_path}\n\n¿Desea mover la base de datos a esta ubicación?\n\nNota: La aplicación se reiniciará.",
+                        f"Nueva ubicacií³n: {new_path}\n\nÂ¿Desea mover la base de datos a esta ubicacií³n?\n\nNota: La aplicacií³n se reiniciará.",
                         QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
                     )
                     
@@ -3969,7 +4588,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Error", f"Error configurando DB: {e}")
     
     def _get_db_size(self, path: str) -> str:
-        """Obtener tamaño de la base de datos"""
+        """Obtener tamaí±o de la base de datos"""
         try:
             import os
             if os.path.exists(path):
@@ -3986,24 +4605,24 @@ class MainWindow(QtWidgets.QMainWindow):
             return "Desconocido"
     
     def _move_database(self, old_path: str, new_path: str) -> None:
-        """Método deshabilitado - sistema optimizado usa solo MySQL directo"""
+        """Mí©todo deshabilitado - sistema optimizado usa solo MySQL directo"""
         QtWidgets.QMessageBox.information(
             self,
-            "Operación no disponible",
+            "Operacií³n no disponible",
             "El sistema optimizado usa MySQL directo.\nNo requiere mover bases de datos locales."
         )
         return
 
     def open_configuracion(self) -> None:
-        """Abrir diálogo de configuración general del sistema"""
+        """Abrir diálogo de configuracií³n general del sistema"""
         try:
-            # Crear diálogo de configuración
+            # Crear diálogo de configuracií³n
             dialog = ConfiguracionDialog(self)
             dialog.exec()
             
-            # Actualizar totales después de cualquier cambio
+            # Actualizar totales despuí©s de cualquier cambio
             self.refresh_totals_only()
-            # Aplicar línea por defecto actualizada si cambió
+            # Aplicar lí­nea por defecto actualizada si cambií³
             try:
                 from ..config import settings as _settings
                 # Rellenar opciones por modo actual
@@ -4020,7 +4639,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
             
         except Exception as e:
-            QtWidgets.QMessageBox.warning(self, "Error", f"Error abriendo configuración: {e}")
+            QtWidgets.QMessageBox.warning(self, "Error", f"Error abriendo configuracií³n: {e}")
 
     def toggle_fullscreen_mode(self) -> None:
         """Alternar entre modo pantalla completa y modo normal"""
@@ -4052,22 +4671,22 @@ class MainWindow(QtWidgets.QMainWindow):
             }
         """)
         
-        # Ocultar todo el contenedor del selector de línea
+        # Ocultar todo el contenedor del selector de lí­nea
         if hasattr(self, 'linea_container_widget'):
             self.linea_container_widget.hide()
         
-        # Ocultar la barra de menú y status
+        # Ocultar la barra de meníº y status
         self.menuBar().hide()
         self.statusBar().hide()
         
-        # MANTENER EL LOGO VISIBLE - asegurarse de que esté visible
+        # MANTENER EL LOGO VISIBLE - asegurarse de que estí© visible
         if hasattr(self, 'logo_label'):
             self.logo_label.show()
             self.logo_label.raise_()  # Traer al frente
         
-        # Modificar el título del plan - incluir información de la línea actual
+        # Modificar el tí­tulo del plan - incluir informacií³n de la lí­nea actual
         linea_actual = self.linea_selector.currentText() if hasattr(self, 'linea_selector') else "N/A"
-        self.title_plan.setText(f"PLAN DE PRODUCCIÓN - LÍNEA {linea_actual} - ESCANEO ACTIVO")
+        self.title_plan.setText(f"PLAN DE PRODUCCIí“N - LíNEA {linea_actual} - ESCANEO ACTIVO")
         self.title_plan.setStyleSheet("""
             font-weight: bold; 
             font-size: 24px; 
@@ -4078,7 +4697,7 @@ class MainWindow(QtWidgets.QMainWindow):
             text-align: center;
         """)
         
-        # Aumentar tamaño de fuente de la tabla
+        # Aumentar tamaí±o de fuente de la tabla
         self.table_plan.setStyleSheet("""
             QTableWidget {
                 font-size: 18px; 
@@ -4110,7 +4729,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Cambiar a pantalla completa
         self.showFullScreen()
         
-        # Mostrar botón para salir del modo pantalla completa
+        # Mostrar botí³n para salir del modo pantalla completa
         if hasattr(self, 'exit_fullscreen_btn'):
             self.exit_fullscreen_btn.show()
             self.exit_fullscreen_btn.raise_()  # Traer al frente
@@ -4118,7 +4737,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Actualizar estado
         self._fullscreen_mode = True
         
-        # El campo de escaneo mantiene el foco aunque esté invisible
+        # El campo de escaneo mantiene el foco aunque estí© invisible
         self.scan_input.setFocus()
         # Forzar que mantenga el foco de manera más agresiva
         QtCore.QTimer.singleShot(100, lambda: self.scan_input.setFocus())
@@ -4130,19 +4749,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.scan_input.setStyleSheet("")  # Eliminar estilos personalizados
         self.scan_input.show()
         
-        # Mostrar el contenedor del selector de línea
+        # Mostrar el contenedor del selector de lí­nea
         if hasattr(self, 'linea_container_widget'):
             self.linea_container_widget.show()
         
-        # Mostrar la barra de menú y status
+        # Mostrar la barra de meníº y status
         self.menuBar().show()
         self.statusBar().show()
         
-        # Restaurar título del plan
-        self.title_plan.setText("Plan de Producción (Línea Seleccionada)")
+        # Restaurar tí­tulo del plan
+        self.title_plan.setText("Plan de Produccií³n (Lí­nea Seleccionada)")
         self.title_plan.setStyleSheet("font-weight: bold; margin-top:8px;")
         
-        # Restaurar tamaño de fuente de la tabla
+        # Restaurar tamaí±o de fuente de la tabla
         self.table_plan.setStyleSheet("""
             QTableWidget {font-size:14px; gridline-color:#2d3e50;}
             QHeaderView::section {background:#1f2d3a; color:#e0e0e0; font-weight:bold; font-size:13px; padding:4px;}
@@ -4151,23 +4770,23 @@ class MainWindow(QtWidgets.QMainWindow):
         # Restaurar altura de las filas
         self.table_plan.verticalHeader().setDefaultSectionSize(32)
         
-        # Restaurar tamaño normal del logo
+        # Restaurar tamaí±o normal del logo
         if hasattr(self, 'logo_label'):
             logo_path = ROOT_DIR / "logoLogIn.png"
             if logo_path.exists():
                 pix = QtGui.QPixmap(str(logo_path))
                 if not pix.isNull():
-                    # Tamaño normal del logo
+                    # Tamaí±o normal del logo
                     self.logo_label.setPixmap(pix.scaledToHeight(28, QtCore.Qt.TransformationMode.SmoothTransformation))
         
         # Restaurar ventana normal
         self.showNormal()
         
-        # Ocultar botón de salir del modo pantalla completa
+        # Ocultar botí³n de salir del modo pantalla completa
         if hasattr(self, 'exit_fullscreen_btn'):
             self.exit_fullscreen_btn.hide()
         
-        # Restaurar geometría si se guardó
+        # Restaurar geometrí­a si se guardí³
         if self._normal_window_state:
             self.restoreGeometry(self._normal_window_state)
         
@@ -4201,7 +4820,7 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             self.scan_processed_signal.emit(linea or "", nparte or "", event or "")
         except RuntimeError:
-            # La ventana ya se cerró; ignorar
+            # La ventana ya se cerrí³; ignorar
             pass
 
     @QtCore.pyqtSlot(str, str, str)
@@ -4210,12 +4829,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if event != "PAIR_COMPLETED":
             return
         try:
-            # Actualizar el timestamp del último escaneo para esta línea
+            # Actualizar el timestamp del íºltimo escaneo para esta lí­nea
             import time
             if linea:
                 self._last_scan_time_per_line[linea] = time.time()
             
-            # 🚀 OPTIMIZACIÓN: Actualizar caché de métricas inmediatamente
+            # ðŸš€ OPTIMIZACIí“N: Actualizar cachí© de mí©tricas inmediatamente
             # (sin consultar MySQL, solo incrementa contador en SQLite)
             try:
                 from ..services.metrics_cache import get_metrics_cache
@@ -4225,34 +4844,37 @@ class MainWindow(QtWidgets.QMainWindow):
                 if metrics_cache and linea:
                     fecha_hoy = date.today().isoformat()
                     
-                    # Obtener métricas actuales del caché
+                    # Obtener mí©tricas actuales del cachí©
                     cached = metrics_cache.get_metrics_from_cache(linea, fecha_hoy)
                     if cached:
-                        # Incrementar producción real
+                        # Incrementar produccií³n real
                         cached['produccion_real'] += 1
                         
                         # Recalcular eficiencia
                         if cached['plan_acumulado'] > 0:
                             cached['eficiencia'] = (cached['produccion_real'] / cached['plan_acumulado']) * 100
                         
-                        # Actualizar caché
+                        # Actualizar cachí©
                         metrics_cache.update_metrics_instant(linea, fecha_hoy, cached)
                         
-                        # 🚀 Actualizar cards instantáneamente desde caché
-                        if self.linea_selector.currentText() == linea:
-                            self._update_cards_with_metrics(
-                                cached['plan_total'],
-                                cached['plan_acumulado'],
-                                cached['produccion_real'],
-                                cached['eficiencia'],
-                                cached['uph'],
-                                cached['upph']
-                            )
-                            logger.debug(f"⚡ Cards actualizadas instantáneamente desde caché tras escaneo")
+                        # âš ï¸ NO actualizar cards desde cachí© - ahora usamos cálculo directo desde SQLite
+                        # El timer de _update_plan_totals() se encarga de actualizar las tarjetas
+                        
+                        # Cí“DIGO VIEJO (DESHABILITADO):
+                        # if self.linea_selector.currentText() == linea:
+                        #     self._update_cards_with_metrics(
+                        #         cached['plan_total'],
+                        #         cached['plan_acumulado'],  # âŒ Este valor es INCORRECTO (no usa tiempo transcurrido)
+                        #         cached['produccion_real'],
+                        #         cached['eficiencia'],
+                        #         cached['uph'],
+                        #         cached['upph']
+                        #     )
+                        #     logger.debug(f" Cards actualizadas instantáneamente desde cachí© tras escaneo")
             except Exception as cache_err:
-                logger.debug(f"Error actualizando caché de métricas: {cache_err}")
+                logger.debug(f"Error actualizando cachí© de mí©tricas: {cache_err}")
             
-            # ⚡ ACTUALIZACIÓN INCREMENTAL: Actualizar solo la fila del nparte escaneado
+            #  ACTUALIZACIí“N INCREMENTAL: Actualizar solo la fila del nparte escaneado
             # Esto es rápido porque solo actualiza UNA fila, no toda la tabla
             try:
                 self._update_single_plan_row(nparte, linea)
@@ -4270,24 +4892,57 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as refresh_err:
             logger.debug(f"Error en handle_scan_processed: {refresh_err}")
         try:
-            # Sincronizar métricas si la ventana flotante está abierta
+            # Sincronizar mí©tricas si la ventana flotante está abierta
             # Esto es rápido porque solo copia valores ya calculados
             self._sync_metrics_to_widget()
         except Exception:
             pass
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
-        """Desregistrar listeners antes de cerrar la ventana."""
+        """Sincronizar datos pendientes y cerrar la ventana correctamente."""
         try:
+            # Mostrar mensaje de sincronización
+            from PyQt6.QtWidgets import QMessageBox, QProgressDialog
+            from PyQt6.QtCore import Qt
+            
+            progress = QProgressDialog("Sincronizando datos con MySQL...", None, 0, 0, self)
+            progress.setWindowTitle("Cerrando")
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.setCancelButton(None)
+            progress.setMinimumDuration(0)
+            progress.setValue(0)
+            progress.show()
+            QtWidgets.QApplication.processEvents()
+            
+            # Sincronizar datos pendientes antes de cerrar
+            if hasattr(self, '_dual_db') and self._dual_db:
+                logger.info("🔄 Sincronizando datos antes de cerrar...")
+                sync_result = self._dual_db.sync_before_shutdown()
+                
+                total_synced = (sync_result.get('scans_synced', 0) + 
+                               sync_result.get('increments_synced', 0) + 
+                               sync_result.get('production_synced', 0))
+                
+                if total_synced > 0:
+                    logger.info(f"✅ {total_synced} registros sincronizados antes de cerrar")
+                    progress.setLabelText(f"Sincronizados {total_synced} registros")
+                    QtWidgets.QApplication.processEvents()
+                else:
+                    logger.info("✅ Todo estaba sincronizado")
+            
+            progress.close()
+            
+            # Desregistrar listeners
             if getattr(self, "_direct_mysql_listener_registered", False) and getattr(self, "_direct_mysql", None):
                 self._direct_mysql.unregister_scan_listener(self._emit_scan_processed)
-        except Exception:
-            pass
+                
+        except Exception as e:
+            logger.error(f"Error en closeEvent: {e}")
         finally:
             super().closeEvent(event)
 
     def _get_line_options(self) -> list:
-        """Opciones de línea según modo actual (ASSY/IMD)."""
+        """Opciones de lí­nea segíºn modo actual (ASSY/IMD)."""
         try:
             from ..config import settings as _settings
             mode = getattr(_settings, 'APP_MODE', 'ASSY').upper()
@@ -4296,3 +4951,17 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         return ["M1", "M2", "M3", "M4", "D1", "D2", "D3", "H1"]
+
+
+
+
+
+
+
+
+
+
+
+
+
+

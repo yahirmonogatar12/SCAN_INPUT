@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from typing import List, Optional, Dict, Any
 import pymysql
 from pymysql import Error
@@ -539,33 +539,83 @@ class MySQLDatabase:
         """
         Actualiza el estado de un plan en la tabla MySQL plan_main usando su ID único
         
+        Si no encuentra el plan_id, busca por nparte y línea (FALLBACK para IDs regenerados)
+
         Args:
             plan_id: ID único del plan
             nuevo_estado: Nuevo estado (EN PROGRESO, PAUSADO, TERMINADO)
-            
+
         Returns:
             bool: True si la actualización fue exitosa, False en caso contrario
         """
-        # NO modificar started_at en MySQL - solo actualizar estado
-        sql = """
-        UPDATE plan_main 
-        SET status = %s, updated_at = NOW()
-        WHERE id = %s
-        """
-        
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
+                    # Intentar actualizar con el plan_id original
+                    sql = """
+                    UPDATE plan_main
+                    SET status = %s, updated_at = NOW()
+                    WHERE id = %s
+                    """
                     cursor.execute(sql, (nuevo_estado, plan_id))
+
+                    if cursor.rowcount > 0:
+                        conn.commit()
+                        logger.info(f"Estado actualizado en MySQL: plan_id={plan_id} -> {nuevo_estado}")
+                        return True
+
+                    # FALLBACK: Buscar el nparte y línea del plan en SQLite
+                    logger.warning(f"No se encontró el plan con id: {plan_id} en MySQL")
+                    logger.info(f"🔄 FALLBACK: Buscando plan alternativo por nparte y línea...")
                     
-                    if cursor.rowcount == 0:
-                        logger.warning(f"No se encontró el plan con id: {plan_id} en MySQL")
+                    # Obtener nparte y línea del plan local
+                    import sqlite3
+                    sqlite_path = "app/db.sqlite3"
+                    sqlite_conn = sqlite3.connect(sqlite_path, timeout=5.0)
+                    sqlite_cursor = sqlite_conn.cursor()
+                    
+                    sqlite_cursor.execute("""
+                        SELECT nparte, linea FROM plan_local WHERE id = ?
+                    """, (plan_id,))
+                    result = sqlite_cursor.fetchone()
+                    sqlite_conn.close()
+                    
+                    if not result:
+                        logger.warning(f"⚠️ No se pudo obtener nparte/línea del plan {plan_id} en SQLite")
                         return False
                     
-                    conn.commit()
-                    logger.info(f"Estado actualizado en MySQL: plan_id={plan_id} -> {nuevo_estado}")
-                    return True
+                    nparte, linea = result
+                    logger.info(f"📋 Plan original: nparte={nparte}, linea={linea}")
                     
+                    # Buscar plan activo con mismo nparte y línea en MySQL
+                    cursor.execute("""
+                        SELECT id FROM plan_main
+                        WHERE nparte = %s AND linea = %s
+                        AND status IN ('PENDIENTE', 'EN PROGRESO', 'PAUSADO')
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    """, (nparte, linea))
+                    
+                    fallback_result = cursor.fetchone()
+                    if not fallback_result:
+                        logger.warning(f"⚠️ No se encontró plan alternativo para nparte={nparte}, linea={linea}")
+                        return False
+                    
+                    fallback_id = fallback_result[0]
+                    logger.info(f"✅ FALLBACK: Encontrado plan_id={fallback_id} para mismo nparte/línea")
+                    
+                    # Actualizar el plan encontrado
+                    cursor.execute("""
+                        UPDATE plan_main
+                        SET status = %s, updated_at = NOW()
+                        WHERE id = %s
+                    """, (nuevo_estado, fallback_id))
+                    
+                    conn.commit()
+                    logger.info(f"✅ Estado actualizado vía FALLBACK: plan_id={fallback_id} -> {nuevo_estado}")
+                    return True
+
         except Exception as e:
             logger.error(f"❌ Error actualizando estado del plan {plan_id} en MySQL: {e}")
             return False
+

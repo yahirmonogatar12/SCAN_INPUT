@@ -1,4 +1,4 @@
-"""
+﻿"""
 Sistema dual SQLite + MySQL para mayor rendimiento local
 SQLite: Respuesta ultra-rápida local
 MySQL: Sincronización backend en segundo plano
@@ -71,6 +71,12 @@ class DualDatabaseSystem:
         # Control de bloqueo temporal para operaciones críticas
         self._critical_operation_lock = threading.Lock()
         self._sync_paused = False
+        
+        # Control de limpieza automática por cambio de día
+        from datetime import datetime
+        self._last_known_date = datetime.now(ZoneInfo(settings.TZ)).strftime('%Y-%m-%d')
+        self._last_midnight_check = 0
+        self._last_hourly_cleanup = 0  # Limpieza de scans incompletos cada hora
         
         # Inicializar SQLite
         self._init_sqlite()
@@ -252,6 +258,34 @@ class DualDatabaseSystem:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_plan_line_date ON plan_local(line, working_date)")
             
+            # 📦 Tabla de scans sin plan (FALLBACK cuando no hay plan activo)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS scans_sin_plan (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    scan_id INTEGER NOT NULL,
+                    linea TEXT NOT NULL,
+                    nparte TEXT NOT NULL,
+                    lote TEXT,
+                    cantidad INTEGER DEFAULT 1,
+                    fecha TEXT NOT NULL,
+                    ts TEXT NOT NULL,
+                    scan_format TEXT,
+                    aplicado INTEGER DEFAULT 0,
+                    aplicado_a_plan_id INTEGER,
+                    aplicado_at TEXT,
+                    FOREIGN KEY (scan_id) REFERENCES scans_local(id)
+                )
+            """)
+            
+            # Migración: Agregar scan_format si no existe
+            try:
+                conn.execute("SELECT scan_format FROM scans_sin_plan LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info("🔄 Migrando tabla scans_sin_plan: agregando columna scan_format")
+                conn.execute("ALTER TABLE scans_sin_plan ADD COLUMN scan_format TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sin_plan_linea ON scans_sin_plan(linea, nparte, aplicado)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sin_plan_aplicado ON scans_sin_plan(aplicado)")
+            
             # Migración: agregar columnas si no existen
             try:
                 conn.execute("ALTER TABLE plan_local ADD COLUMN sequence INTEGER DEFAULT 0")
@@ -285,23 +319,43 @@ class DualDatabaseSystem:
         logger.info("SQLite local inicializado correctamente")
     
     def _cleanup_on_startup(self):
-        """🧹 AUTO-REPARACIÓN AL INICIAR: Limpia pending_scans al arrancar la aplicación"""
+        """🧹 AUTO-REPARACIÓN AL INICIAR: Limpia pending_scans y scans_sin_plan antiguos"""
         try:
             with self._get_sqlite_connection(timeout=10.0) as conn:
-                # Contar registros antes de limpiar
+                # 1. Limpiar pending_scans de sesión anterior
                 cursor = conn.execute("SELECT COUNT(*) FROM pending_scans")
                 count_before = cursor.fetchone()[0]
                 
                 if count_before > 0:
                     logger.warning(f"⚠️  INICIO: Encontrados {count_before} pending_scans de sesión anterior")
-                    
-                    # Eliminar TODOS los pending_scans (son de sesión anterior, pueden estar corruptos)
                     conn.execute("DELETE FROM pending_scans")
                     conn.commit()
-                    
                     logger.warning(f"🧹 AUTO-REPARACIÓN: Limpiados {count_before} pending_scans al iniciar")
                 else:
                     logger.info("✅ pending_scans limpio al iniciar")
+                
+                # 2. Limpiar scans_sin_plan de días anteriores
+                from datetime import datetime
+                from zoneinfo import ZoneInfo
+                today = datetime.now(ZoneInfo(settings.TZ)).strftime('%Y-%m-%d')
+                
+                cursor_old = conn.execute("""
+                    SELECT COUNT(*) FROM scans_sin_plan 
+                    WHERE fecha < ? AND aplicado = 0
+                """, (today,))
+                old_scans = cursor_old.fetchone()[0]
+                
+                if old_scans > 0:
+                    logger.warning(f"🗑️  INICIO: Encontrados {old_scans} scans_sin_plan de días anteriores")
+                    conn.execute("""
+                        DELETE FROM scans_sin_plan 
+                        WHERE fecha < ? AND aplicado = 0
+                    """, (today,))
+                    conn.commit()
+                    logger.warning(f"🧹 LIMPIEZA AUTOMÁTICA: Eliminados {old_scans} scans antiguos")
+                else:
+                    logger.info("✅ scans_sin_plan sin registros antiguos")
+                    
         except Exception as e:
             logger.error(f"Error en cleanup_on_startup: {e}", exc_info=True)
 
@@ -823,6 +877,31 @@ class DualDatabaseSystem:
                     thirty_secs_ago = (dt.now(ZoneInfo(settings.TZ)) - 
                                      timedelta(seconds=30)).isoformat()
                     
+                    # Primero ver QUÉ se va a eliminar y GUARDARLOS en scans_sin_plan
+                    to_delete = conn_clean.execute("""
+                        SELECT id, nparte, scan_format, ts, lote, cantidad, fecha FROM pending_scans 
+                        WHERE ts < ? AND linea = ?
+                    """, (thirty_secs_ago, linea)).fetchall()
+                    
+                    if to_delete:
+                        logger.warning(f"📦 SCANS HUÉRFANOS ({len(to_delete)}) - Guardando para aplicar cuando se cargue plan:")
+                        for scan in to_delete:
+                            scan_id, nparte, scan_format, ts, lote, cantidad, fecha = scan
+                            logger.warning(f"   - ID:{scan_id} | Part:{nparte} | Tipo:{scan_format} | Lote:{lote}")
+                            
+                            # Guardar en scans_sin_plan para recuperar después
+                            try:
+                                conn_clean.execute("""
+                                    INSERT INTO scans_sin_plan 
+                                    (scan_id, linea, nparte, lote, cantidad, fecha, ts, scan_format, aplicado)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                                """, (scan_id, linea, nparte, lote, cantidad or 1, fecha, ts, scan_format))
+                                logger.info(f"   ✅ Guardado en scans_sin_plan: {nparte} ({scan_format})")
+                            except Exception as e_save:
+                                logger.error(f"   ❌ Error guardando scan {scan_id}: {e_save}")
+                        
+                        logger.warning(f"💡 CAUSA: Plan no existe aún - Se aplicarán cuando se cargue el plan")
+                    
                     deleted = conn_clean.execute("""
                         DELETE FROM pending_scans 
                         WHERE ts < ? AND linea = ?
@@ -853,6 +932,7 @@ class DualDatabaseSystem:
 
             # 2) Validación de PLAN (solo si no es duplicado)
             nparte_plan = getattr(scan_record, 'nparte', None)
+            nparte_escaneado = nparte_plan  # Guardar el nparte escaneado original
             scan_format = getattr(parsed, 'scan_format', 'QR')
             
             # En modo SUB ASSY, skipear validación de plan para escaneos QR (contienen sub_assy)
@@ -970,60 +1050,96 @@ class DualDatabaseSystem:
                 #         resolved = resolve_plan()
 
                 if not resolved:
-                    return -3  # No existe en plan
-
-                if plan_count is not None and produced_count is not None and produced_count >= plan_count:
-                    return -4  # Plan completo alcanzado
-
-                # 🔒 VALIDACIÓN Y AUTO-INICIO: Gestionar estados de planes
-                current_status = status_val.strip().upper()
-                
-                if current_status == 'EN PROGRESO':
-                    # El plan ya está activo, permitir escaneo
-                    pass
-                else:
-                    # El plan NO está EN PROGRESO (está en PLAN o PAUSADO)
-                    # Verificar si ya hay OTRO plan EN PROGRESO con MENOR secuencia
+                    # 📦 PARTE FUERA DE PLAN: Antes de permitir, verificar si hay OTRO plan EN PROGRESO
+                    # Si hay un plan EN PROGRESO para OTRO modelo, rechazar con MODELO DIFERENTE
                     try:
                         with self._get_sqlite_connection(timeout=1.0) as conn_check:
-                            # Obtener secuencia del plan actual
-                            cur_seq = conn_check.execute("""
-                                SELECT sequence FROM plan_local WHERE id = ?
-                            """, (plan_id,)).fetchone()
-                            
-                            plan_sequence = cur_seq[0] if cur_seq else 999
-                            
-                            # Buscar planes EN PROGRESO con menor secuencia (deben completarse primero)
                             cur_check = conn_check.execute("""
-                                SELECT id, part_no, sequence, status, produced_count, plan_count 
-                                FROM plan_local
-                                WHERE line = ? AND id != ? AND status IN ('EN PROGRESO', 'PAUSADO')
+                                SELECT id, part_no FROM plan_local
+                                WHERE line = ? AND status = 'EN PROGRESO'
                                   AND working_date = ?
-                                ORDER BY sequence
                                 LIMIT 1
-                            """, (plan_line, plan_id, today))
-                            otro_plan = cur_check.fetchone()
+                            """, (linea, today))
+                            plan_en_progreso = cur_check.fetchone()
                             
-                            if otro_plan:
-                                otro_seq = otro_plan[2]
-                                otro_produced = otro_plan[4] or 0
-                                otro_plan_count = otro_plan[5] or 0
-                                
-                                # Si hay un plan con menor secuencia que NO está completo, bloq uear
-                                if otro_seq < plan_sequence and otro_produced < otro_plan_count:
-                                    logger.warning(
-                                        f"🚫 Bloqueado: Debes completar primero el plan {otro_plan[1]} "
-                                        f"(seq={otro_seq}, {otro_produced}/{otro_plan_count}, status={otro_plan[3]}) "
-                                        f"antes de iniciar {plan_part_no} (seq={plan_sequence})"
-                                    )
-                                    return -10  # MODELO DIFERENTE (no permitir escaneo fuera de secuencia)
+                            if plan_en_progreso:
+                                plan_activo_nparte = plan_en_progreso[1]
+                                logger.warning(
+                                    f"🚫 MODELO DIFERENTE: Hay plan EN PROGRESO para '{plan_activo_nparte}', "
+                                    f"pero escaneaste '{nparte_escaneado}'. Escaneo rechazado."
+                                )
+                                return -10  # MODELO DIFERENTE - hay un plan activo para otro modelo
                     except Exception as e:
-                        logger.error(f"Error verificando plan activo: {e}")
-                        return -10  # En caso de error, bloquear por seguridad
+                        logger.error(f"Error verificando plan EN PROGRESO: {e}")
                     
-                    # No hay planes anteriores pendientes, AUTO-INICIAR este plan
-                    logger.info(f"🚀 Auto-iniciando plan {plan_part_no} (id={plan_id}, seq={plan_sequence}, status actual={current_status}) en línea {plan_line}")
-                    self._auto_transition_plan(plan_line, plan_id, plan_part_no)
+                    # Si NO hay plan EN PROGRESO, permitir guardar como "FUERA DE PLAN"
+                    logger.warning(f"📦 FUERA DE PLAN: No existe plan para {nparte_escaneado}, permitiendo escaneo (se guardará automáticamente)...")
+                    # NO retornar -3 aquí, permitir que continúe el proceso normal
+                    # El scan irá a pending_scans y luego se moverá a scans_sin_plan
+                    skip_plan_validation = True  # Flag para skipear validaciones posteriores
+                    plan_id = None  # Asegurar que no hay plan_id
+                    nparte_plan = None  # IMPORTANTE: Limpiar para activar fallback después
+
+                if plan_id and plan_count is not None and produced_count is not None and produced_count >= plan_count:
+                    return -4  # Plan completo alcanzado
+
+                # 🔒 VALIDACIÓN Y AUTO-INICIO: Gestionar estados de planes (SOLO si hay plan)
+                if plan_id:
+                    current_status = status_val.strip().upper()
+                    
+                    if current_status == 'EN PROGRESO':
+                        # El plan ya está activo, VALIDAR que el nparte escaneado coincida con el plan
+                        if nparte_plan and nparte_escaneado and nparte_plan != nparte_escaneado:
+                            logger.warning(
+                                f"🚫 MODELO DIFERENTE: Plan EN PROGRESO es para '{nparte_plan}', "
+                                f"pero escaneaste '{nparte_escaneado}'. Escaneo rechazado."
+                            )
+                            return -10  # MODELO DIFERENTE - no permitir escaneo de otro modelo
+                        # Si coincide, permitir escaneo
+                        pass
+                    else:
+                        # El plan NO está EN PROGRESO (está en PLAN o PAUSADO)
+                        # Verificar si ya hay OTRO plan EN PROGRESO con MENOR secuencia
+                        try:
+                            with self._get_sqlite_connection(timeout=1.0) as conn_check:
+                                # Obtener secuencia del plan actual
+                                cur_seq = conn_check.execute("""
+                                    SELECT sequence FROM plan_local WHERE id = ?
+                                """, (plan_id,)).fetchone()
+                                
+                                plan_sequence = cur_seq[0] if cur_seq else 999
+                                
+                                # Buscar planes EN PROGRESO con menor secuencia (deben completarse primero)
+                                cur_check = conn_check.execute("""
+                                    SELECT id, part_no, sequence, status, produced_count, plan_count 
+                                    FROM plan_local
+                                    WHERE line = ? AND id != ? AND status IN ('EN PROGRESO', 'PAUSADO')
+                                      AND working_date = ?
+                                    ORDER BY sequence
+                                    LIMIT 1
+                                """, (plan_line, plan_id, today))
+                                otro_plan = cur_check.fetchone()
+                                
+                                if otro_plan:
+                                    otro_seq = otro_plan[2]
+                                    otro_produced = otro_plan[4] or 0
+                                    otro_plan_count = otro_plan[5] or 0
+                                    
+                                    # Si hay un plan con menor secuencia que NO está completo, bloq uear
+                                    if otro_seq < plan_sequence and otro_produced < otro_plan_count:
+                                        logger.warning(
+                                            f"🚫 Bloqueado: Debes completar primero el plan {otro_plan[1]} "
+                                            f"(seq={otro_seq}, {otro_produced}/{otro_plan_count}, status={otro_plan[3]}) "
+                                            f"antes de iniciar {plan_part_no} (seq={plan_sequence})"
+                                        )
+                                        return -10  # MODELO DIFERENTE (no permitir escaneo fuera de secuencia)
+                        except Exception as e:
+                            logger.error(f"Error verificando plan activo: {e}")
+                            return -10  # En caso de error, bloquear por seguridad
+                        
+                        # No hay planes anteriores pendientes, AUTO-INICIAR este plan
+                        logger.info(f"🚀 Auto-iniciando plan {plan_part_no} (id={plan_id}, seq={plan_sequence}, status actual={current_status}) en línea {plan_line}")
+                        self._auto_transition_plan(plan_line, plan_id, plan_part_no)
 
             # Modo SOLO QR: si está activo, insertar par completo (QR + BARCODE sintético) inmediatamente
             if getattr(settings, 'SOLO_QR_MODE', False):
@@ -1143,7 +1259,21 @@ class DualDatabaseSystem:
             # ⚡ USAR HELPER THREAD-SAFE para evitar "database is locked"
             # TIMEOUT AUMENTADO: 5s para evitar fallos cuando sync worker está activo
             with self._get_sqlite_connection(timeout=5.0) as conn:
-                # 🔄 PASO 1: Guardar en STAGING (temporal) - NO en tabla final
+                # � VALIDACIÓN RÁPIDA: Verificar si ya hay un scan del MISMO tipo esperando
+                check_same = conn.execute("""
+                    SELECT COUNT(*) FROM pending_scans
+                    WHERE nparte = ? AND linea = ? AND scan_format = ?
+                """, (scan_record.nparte, linea, scan_format)).fetchone()
+                
+                if check_same and check_same[0] > 0:
+                    # Ya hay un scan del mismo tipo esperando - ERROR
+                    logger.warning(f"🚫 TARJETA DUPLICADA: Ya hay un {scan_format}")
+                    if scan_format == "QR":
+                        return -8  # QR DUPLICADO - necesita escanear BARCODE
+                    else:
+                        return -9  # BARCODE DUPLICADO - necesita escanear QR
+
+                # �� PASO 1: Guardar en STAGING (temporal) - NO en tabla final
                 # Usar la fecha REAL parseada del QR (fecha_iso) si existe; esto es crítico para detectar duplicados correctamente.
                 parsed_fecha = getattr(scan_record, 'fecha_iso', None)
                 if not parsed_fecha and hasattr(scan_record, 'fecha'):
@@ -1186,18 +1316,50 @@ class DualDatabaseSystem:
                 # Par completo insertado exitosamente
                 # Incrementar produced_count local del plan (1 pieza completa) usando final_nparte
                 logger.info(f"🔍 Par completo - nparte_plan={nparte_plan}, final_nparte={final_nparte}, linea={linea}")
+                
+                # Obtener lote del scan_record para asegurar que incrementamos el plan correcto
+                lote_escaneado = getattr(scan_record, 'lot_no', None) or getattr(scan_record, 'lote', None)
+                
                 if nparte_plan:
                     try:
-                        # Obtener lote del scan_record para asegurar que incrementamos el plan correcto
-                        lote_escaneado = getattr(scan_record, 'lot_no', None) or getattr(scan_record, 'lote', None)
                         logger.info(f"⚡ Incrementando produced_count: linea={linea}, nparte={final_nparte}, lote={lote_escaneado}")
                         self.increment_local_plan_produced(linea, final_nparte, delta=1, lote=lote_escaneado)
                     except Exception as e_inc:
                         logger.error(f"No se pudo incrementar produced_count local: {e_inc}")
                 else:
-                    logger.warning(f"⚠️ nparte_plan es None, NO se incrementa produced_count (linea={linea}, nparte={scan_record.nparte})")
+                    # 📦 FALLBACK: Guardar en scans_sin_plan para aplicar cuando se cargue el plan
+                    try:
+                        with self._get_sqlite_connection(timeout=2.0) as conn_fallback:
+                            # Buscar el scan_id más reciente para este nparte
+                            scan_row = conn_fallback.execute("""
+                                SELECT id FROM scans_local 
+                                WHERE nparte = ? AND linea = ?
+                                ORDER BY id DESC LIMIT 1
+                            """, (final_nparte, linea)).fetchone()
+                            
+                            if scan_row:
+                                scan_id = scan_row[0]
+                                conn_fallback.execute("""
+                                    INSERT INTO scans_sin_plan 
+                                    (scan_id, linea, nparte, lote, cantidad, fecha, ts, scan_format, aplicado)
+                                    VALUES (?, ?, ?, ?, 1, ?, ?, 'PAIR', 0)
+                                """, (
+                                    scan_id,
+                                    linea,
+                                    final_nparte,
+                                    lote_escaneado,
+                                    get_today_mexico_str(),
+                                    datetime.now(ZoneInfo(settings.TZ)).isoformat()
+                                ))
+                                conn_fallback.commit()
+                                logger.warning(f"📦 NO EN PLAN: Scan guardado para aplicar cuando se cargue plan (linea={linea}, nparte={final_nparte})")
+                            else:
+                                logger.error(f"No se encontró scan_id para guardar en fallback")
+                    except Exception as e_fallback:
+                        logger.error(f"Error guardando scan sin plan: {e_fallback}")
+                
                 logger.info(f"✅ PAR COMPLETO: QR+Barcode insertados en DB FINAL ({final_nparte})")
-                return staging_id  # Éxito - par completo insertado
+                return 999999  # Código especial para PAR COMPLETO (distinguible de staging_id)
             elif pair_result == -7:
                 # SUB ASSY validation failed - par rechazado
                 return -7
@@ -1205,7 +1367,7 @@ class DualDatabaseSystem:
                 # Par incompleto (pair_result == 0)
                 opposite = "BARCODE" if scan_format == "QR" else "QR"
                 logger.info(f"⏳ {scan_format} en STAGING, esperando {opposite} para insertar en DB ({scan_record.nparte})")
-                return staging_id  # Éxito - esperando complemento
+                return -5  # Código -5: Esperando par (para que UI lo detecte)
             
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed" in str(e):
@@ -1235,8 +1397,32 @@ class DualDatabaseSystem:
     
     def _try_auto_link(self, conn, new_scan_id: int, nparte: str, linea: str, scan_format: str, modelo: str = None) -> bool:
         """Intenta vincular automáticamente QR y Barcode del mismo N° parte
-        Returns True si se completó la vinculación (ambos escaneos presentes)"""
+        Returns True si se completó la vinculación (ambos escaneos presentes)
+        Returns -8 si detecta QR+QR duplicado
+        Returns -9 si detecta BARCODE+BARCODE duplicado"""
         try:
+            # 🚨 VALIDACIÓN: Verificar si hay un scan del MISMO tipo sin vincular
+            cursor_same = conn.execute("""
+                SELECT id FROM scans_local 
+                WHERE nparte = ? AND scan_format = ? 
+                AND linked_scan_id IS NULL
+                AND id != ?
+                ORDER BY id DESC LIMIT 1
+            """, (nparte, scan_format, new_scan_id))
+            
+            same_type_scan = cursor_same.fetchone()
+            if same_type_scan:
+                # Hay un scan del mismo tipo esperando - ERROR
+                logger.warning(f"🚫 ERROR: Detectado {scan_format}+{scan_format} para {nparte}. Escanea el complemento correcto.")
+                # Eliminar el scan recién agregado (está incorrecto)
+                conn.execute("DELETE FROM scans_local WHERE id = ?", (new_scan_id,))
+                conn.commit()
+                # Retornar código específico según el tipo
+                if scan_format == "QR":
+                    return -8  # QR DUPLICADO - necesita escanear BARCODE
+                else:
+                    return -9  # BARCODE DUPLICADO - necesita escanear QR
+            
             # Buscar escaneo complementario (QR busca BARCODE y viceversa)
             opposite_format = "BARCODE" if scan_format == "QR" else "QR"
             
@@ -1607,6 +1793,95 @@ class DualDatabaseSystem:
                         self._last_cleanup = now
                     except Exception as e_cleanup:
                         logger.debug(f"Error en limpieza periódica: {e_cleanup}")
+
+                # 🗑️ LIMPIEZA DE MEDIANOCHE: Borrar scans_sin_plan antiguos automáticamente
+                # Verificar cada 10 minutos si cambió el día
+                last_midnight_check = getattr(self, '_last_midnight_check', 0)
+                if now - last_midnight_check > 600:  # 10 minutos = 600 segundos
+                    try:
+                        from datetime import datetime as dt
+                        current_date = dt.now(ZoneInfo(settings.TZ)).strftime('%Y-%m-%d')
+                        last_date = getattr(self, '_last_known_date', current_date)
+                        
+                        # Si cambió el día, limpiar scans_sin_plan del día anterior
+                        if current_date != last_date:
+                            logger.info(f"📅 CAMBIO DE DÍA DETECTADO: {last_date} -> {current_date}")
+                            with self._get_sqlite_connection(timeout=5.0) as conn:
+                                deleted = conn.execute("""
+                                    DELETE FROM scans_sin_plan 
+                                    WHERE fecha < ? AND aplicado = 0
+                                """, (current_date,))
+                                
+                                count = deleted.rowcount
+                                if count > 0:
+                                    logger.warning(f"🗑️ LIMPIEZA AUTOMÁTICA (medianoche): Eliminados {count} scans_sin_plan del día anterior")
+                                conn.commit()
+                            
+                            self._last_known_date = current_date
+                        
+                        self._last_midnight_check = now
+                    except Exception as e_midnight:
+                        logger.debug(f"Error en limpieza de medianoche: {e_midnight}")
+
+                # 🧹 LIMPIEZA HORARIA: Borrar scans_sin_plan incompletos (sin par) después de 1 hora
+                last_hourly_cleanup = getattr(self, '_last_hourly_cleanup', 0)
+                if now - last_hourly_cleanup > 3600:  # 1 hora = 3600 segundos
+                    try:
+                        from datetime import datetime as dt, timedelta
+                        one_hour_ago = (dt.now(ZoneInfo(settings.TZ)) - timedelta(hours=1)).isoformat()
+                        
+                        with self._get_sqlite_connection(timeout=5.0) as conn:
+                            # Buscar scans que tienen más de 1 hora y no forman pares
+                            # Agrupar por nparte para contar QR y BC
+                            cursor = conn.execute("""
+                                SELECT nparte, scan_format, COUNT(*) as total
+                                FROM scans_sin_plan
+                                WHERE ts < ? AND aplicado = 0
+                                GROUP BY nparte, scan_format
+                            """, (one_hour_ago,))
+                            
+                            old_scans = cursor.fetchall()
+                            
+                            if old_scans:
+                                # Analizar cuáles están incompletos
+                                grupos = {}
+                                for nparte, scan_format, count in old_scans:
+                                    if nparte not in grupos:
+                                        grupos[nparte] = {'QR': 0, 'BC': 0, 'PAIR': 0}
+                                    if scan_format == 'PAIR':
+                                        grupos[nparte]['PAIR'] += count
+                                    elif scan_format in ('QR', 'BARCODE'):
+                                        grupos[nparte][scan_format if scan_format == 'QR' else 'BC'] += count
+                                
+                                # Eliminar solo los que NO forman pares (QR sin BC o BC sin QR)
+                                total_deleted = 0
+                                for nparte, stats in grupos.items():
+                                    qr = stats['QR']
+                                    bc = stats['BC']
+                                    
+                                    # Si hay desbalance (QR sin BC o BC sin QR), eliminar los huérfanos
+                                    if qr > bc:
+                                        # Eliminar QRs sobrantes
+                                        deleted = conn.execute("""
+                                            DELETE FROM scans_sin_plan
+                                            WHERE nparte = ? AND scan_format = 'QR' AND ts < ? AND aplicado = 0
+                                        """, (nparte, one_hour_ago))
+                                        total_deleted += deleted.rowcount
+                                    elif bc > qr:
+                                        # Eliminar BARCODEs sobrantes
+                                        deleted = conn.execute("""
+                                            DELETE FROM scans_sin_plan
+                                            WHERE nparte = ? AND scan_format = 'BARCODE' AND ts < ? AND aplicado = 0
+                                        """, (nparte, one_hour_ago))
+                                        total_deleted += deleted.rowcount
+                                
+                                if total_deleted > 0:
+                                    logger.warning(f"🗑️ LIMPIEZA HORARIA: Eliminados {total_deleted} scans incompletos (>1 hora sin formar par)")
+                                    conn.commit()
+                        
+                        self._last_hourly_cleanup = now
+                    except Exception as e_hourly:
+                        logger.debug(f"Error en limpieza horaria: {e_hourly}")
 
                 # Dormir según la carga (AUMENTADO a 5s para reducir contención)
                 time.sleep(5)  # Sincronizar cada 5 segundos (menos presión en SQLite)
@@ -2049,17 +2324,46 @@ class DualDatabaseSystem:
                                 mysql_started_at = mysql_started_at.strftime('%Y-%m-%d %H:%M:%S')
                             
                             # Obtener planned_start, planned_end y effective_minutes
-                            planned_start = r.get('planned_start')
-                            if planned_start and not isinstance(planned_start, str):
-                                planned_start = planned_start.strftime('%Y-%m-%d %H:%M:%S')
+                            planned_start_raw = r.get('planned_start')
+                            planned_end_raw = r.get('planned_end')
                             
-                            planned_end = r.get('planned_end')
-                            if planned_end and not isinstance(planned_end, str):
-                                planned_end = planned_end.strftime('%Y-%m-%d %H:%M:%S')
+                            # 📅 CONSTRUIR FECHA COMPLETA: working_date + hora de planned_start/end
+                            # MySQL solo guarda hora, necesitamos combinar con working_date
+                            if planned_start_raw:
+                                # Si planned_start es datetime, extraer solo la hora
+                                if not isinstance(planned_start_raw, str):
+                                    planned_start_time = planned_start_raw.strftime('%H:%M:%S')
+                                else:
+                                    # Si es string, puede ser 'HH:MM:SS' o 'YYYY-MM-DD HH:MM:SS'
+                                    if ' ' in planned_start_raw:
+                                        planned_start_time = planned_start_raw.split(' ')[1]
+                                    else:
+                                        planned_start_time = planned_start_raw
+                                
+                                # Combinar working_date (fecha) + hora
+                                planned_start = f"{working_date_str} {planned_start_time}"
+                            else:
+                                planned_start = None
+                            
+                            if planned_end_raw:
+                                # Si planned_end es datetime, extraer solo la hora
+                                if not isinstance(planned_end_raw, str):
+                                    planned_end_time = planned_end_raw.strftime('%H:%M:%S')
+                                else:
+                                    # Si es string, puede ser 'HH:MM:SS' o 'YYYY-MM-DD HH:MM:SS'
+                                    if ' ' in planned_end_raw:
+                                        planned_end_time = planned_end_raw.split(' ')[1]
+                                    else:
+                                        planned_end_time = planned_end_raw
+                                
+                                # Combinar working_date (fecha) + hora
+                                planned_end = f"{working_date_str} {planned_end_time}"
+                            else:
+                                planned_end = None
                             
                             effective_minutes = r.get('effective_minutes', 0) or 0
                             
-                            # 🛡️ PROTECCIÓN CONTRA SOBRESCRITURA: Sumar incrementos pendientes del buffer
+                            # PROTECCIÓN CONTRA SOBRESCRITURA: Sumar incrementos pendientes del buffer
                             plan_id = r['id']
                             pending_increment = self._plan_produced_buffer.get(plan_id, 0)
                             
@@ -2164,6 +2468,9 @@ class DualDatabaseSystem:
                         self._plan_changed = False
                     
                     conn.commit()
+                
+                # 📦 APLICAR SCANS PENDIENTES: Si hay scans sin plan, aplicarlos ahora
+                self._aplicar_scans_pendientes()
                 
                 # 🔄 INVALIDAR CACHE: Forzar recarga de plan en siguiente consulta
                 self._plan_cache = []
@@ -2737,6 +3044,177 @@ class DualDatabaseSystem:
             logger.error(f"Error actualizando caché de plan {plan_id}: {e}")
             return False
     
+    
+    def sync_before_shutdown(self) -> dict:
+        """
+         SINCRONIZACIÓN FINAL antes de cerrar el programa
+        
+        Verifica y sincroniza todos los datos pendientes con MySQL:
+        - Incrementos de producción pendientes
+        - Scans en SQLite que no estén en MySQL
+        - Totales de producción desincronizados
+        
+        Returns:
+            dict: Resumen de la sincronización con contadores
+        """
+        logger.info(" INICIANDO SINCRONIZACIÓN FINAL ANTES DE CERRAR...")
+        result = {
+            'scans_synced': 0,
+            'increments_synced': 0,
+            'production_synced': 0,
+            'errors': []
+        }
+        
+        try:
+            # 1. Sincronizar incrementos pendientes en direct_mysql
+            try:
+                if hasattr(self, '_direct_mysql') and self._direct_mysql:
+                    logger.info(" Sincronizando incrementos pendientes...")
+                    self._direct_mysql.sync_pending_increments()
+                    result['increments_synced'] = len(getattr(self._direct_mysql, '_sync_queue', []))
+                    logger.info(f" {result['increments_synced']} incrementos sincronizados")
+            except Exception as e:
+                error_msg = f"Error sincronizando incrementos: {e}"
+                logger.error(error_msg)
+                result['errors'].append(error_msg)
+            
+            # 2. Verificar scans en SQLite que no estén en MySQL
+            try:
+                logger.info(" Verificando scans pendientes de sincronizar...")
+                with self._get_sqlite_connection(timeout=5.0) as conn:
+                    # Obtener fecha actual
+                    today = datetime.now(ZoneInfo("America/Monterrey")).strftime("%Y-%m-%d")
+                    
+                    # Contar scans locales del día
+                    local_cursor = conn.execute("""
+                        SELECT COUNT(*) FROM scans_local 
+                        WHERE DATE(ts) = ?
+                    """, (today,))
+                    local_count = local_cursor.fetchone()[0]
+                    
+                    logger.info(f" Scans locales hoy: {local_count}")
+                    
+                    # Verificar en MySQL
+                    from ..db import get_db
+                    db = get_db()
+                    with db.get_connection() as mysql_conn:
+                        with mysql_conn.cursor() as mysql_cursor:
+                            mysql_cursor.execute("""
+                                SELECT COUNT(*) FROM scans 
+                                WHERE DATE(ts) = %s
+                            """, (today,))
+                            mysql_count = mysql_cursor.fetchone()[0]
+                            
+                            logger.info(f" Scans en MySQL hoy: {mysql_count}")
+                            
+                            # Si hay diferencia, sincronizar los faltantes
+                            if local_count > mysql_count:
+                                diff = local_count - mysql_count
+                                logger.warning(f"  Faltan {diff} scans en MySQL. Sincronizando...")
+                                
+                                # Obtener scans locales que no estén en MySQL
+                                local_scans = conn.execute("""
+                                    SELECT id, raw, nparte, linea, ts, modelo, scan_format, 
+                                           plan_id, barcode_sequence
+                                    FROM scans_local 
+                                    WHERE DATE(ts) = ?
+                                    ORDER BY ts DESC
+                                    LIMIT ?
+                                """, (today, diff)).fetchall()
+                                
+                                # Insertar en MySQL
+                                for scan in local_scans:
+                                    try:
+                                        mysql_cursor.execute("""
+                                            INSERT INTO scans 
+                                            (raw, nparte, linea, ts, modelo, scan_format, 
+                                             plan_id, barcode_sequence)
+                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                            ON DUPLICATE KEY UPDATE id=id
+                                        """, scan[1:])
+                                        result['scans_synced'] += 1
+                                    except Exception as e:
+                                        logger.debug(f"Scan ya existe en MySQL: {scan[1]}")
+                                
+                                mysql_conn.commit()
+                                logger.info(f" {result['scans_synced']} scans sincronizados a MySQL")
+                            else:
+                                logger.info(" Todos los scans están sincronizados")
+                    
+            except Exception as e:
+                error_msg = f"Error sincronizando scans: {e}"
+                logger.error(error_msg)
+                result['errors'].append(error_msg)
+            
+            # 3. Sincronizar totales de producción
+            try:
+                logger.info(" Verificando totales de producción...")
+                with self._get_sqlite_connection(timeout=5.0) as conn:
+                    today = datetime.now(ZoneInfo("America/Monterrey")).strftime("%Y-%m-%d")
+                    
+                    # Obtener totales locales
+                    local_totals = conn.execute("""
+                        SELECT plan_id, produced_count 
+                        FROM production_totals_local 
+                        WHERE fecha = ?
+                    """, (today,)).fetchall()
+                    
+                    if local_totals:
+                        from ..db import get_db
+                        db = get_db()
+                        with db.get_connection() as mysql_conn:
+                            with mysql_conn.cursor() as mysql_cursor:
+                                for plan_id, local_produced in local_totals:
+                                    # Verificar en MySQL
+                                    mysql_cursor.execute("""
+                                        SELECT produced_count FROM plan_main 
+                                        WHERE id = %s
+                                    """, (plan_id,))
+                                    mysql_result = mysql_cursor.fetchone()
+                                    
+                                    if mysql_result:
+                                        mysql_produced = mysql_result[0] or 0
+                                        if local_produced > mysql_produced:
+                                            diff = local_produced - mysql_produced
+                                            logger.warning(f"  Plan {plan_id}: Local={local_produced}, MySQL={mysql_produced} (diff={diff})")
+                                            
+                                            # Actualizar MySQL
+                                            mysql_cursor.execute("""
+                                                UPDATE plan_main 
+                                                SET produced_count = %s, updated_at = NOW()
+                                                WHERE id = %s
+                                            """, (local_produced, plan_id))
+                                            result['production_synced'] += 1
+                                
+                                mysql_conn.commit()
+                                logger.info(f" {result['production_synced']} totales de producción sincronizados")
+                    else:
+                        logger.info(" No hay totales pendientes de sincronizar")
+                        
+            except Exception as e:
+                error_msg = f"Error sincronizando producción: {e}"
+                logger.error(error_msg)
+                result['errors'].append(error_msg)
+            
+            # Resumen final
+            total_synced = result['scans_synced'] + result['increments_synced'] + result['production_synced']
+            if total_synced > 0:
+                logger.info(f" SINCRONIZACIÓN COMPLETADA: {total_synced} registros sincronizados")
+                logger.info(f"   - Scans: {result['scans_synced']}")
+                logger.info(f"   - Incrementos: {result['increments_synced']}")
+                logger.info(f"   - Producción: {result['production_synced']}")
+            else:
+                logger.info(" SINCRONIZACIÓN COMPLETADA: Todo estaba sincronizado")
+            
+            if result['errors']:
+                logger.warning(f"  Se encontraron {len(result['errors'])} errores durante la sincronización")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f" Error en sincronización final: {e}")
+            result['errors'].append(str(e))
+            return result
     def actualizar_estado_plan_db_only(self, plan_id: int, nuevo_estado: str, linea: str = None) -> bool:
         """
         ⚡ OPTIMIZACIÓN ULTRA-RÁPIDA: Actualiza SQLite en 1 intento (< 50ms)
@@ -3003,7 +3481,322 @@ class DualDatabaseSystem:
             logger.info(f"Ruta de SQLite local actualizada: {self.sqlite_path}")
         except Exception as e:
             logger.error(f"Error cambiando ruta SQLite local: {e}")
+    
+    def _aplicar_scans_pendientes(self):
+        """
+        📦 FALLBACK: Aplica scans guardados sin plan cuando se carga un nuevo plan.
+        
+        Esta función se ejecuta automáticamente después de sincronizar planes desde MySQL.
+        Si hay scans que fueron escaneados cuando NO había plan activo, los aplica ahora.
+        
+        IMPORTANTE: Solo cuenta PARES COMPLETOS (QR + BARCODE), no scans individuales.
+        """
+        try:
+            # Abrir conexión propia para evitar problemas con conexiones cerradas
+            with self._get_sqlite_connection(timeout=2.0) as conn:
+                # Obtener todos los scans pendientes agrupados por nparte/lote/formato
+                # Necesitamos contar QR y BARCODE por separado para calcular pares
+                pendientes = conn.execute("""
+                    SELECT 
+                        linea,
+                        nparte,
+                        lote,
+                        scan_format,
+                        COUNT(*) as scan_count,
+                        GROUP_CONCAT(id) as fallback_ids
+                    FROM scans_sin_plan
+                    WHERE aplicado = 0
+                    GROUP BY linea, nparte, lote, scan_format
+                    ORDER BY ts ASC
+                """).fetchall()
+                
+                if not pendientes:
+                    return  # No hay nada pendiente
+                
+                logger.info(f"📦 APLICANDO SCANS PENDIENTES: Analizando {len(pendientes)} grupos de scans...")
+                
+                # Agrupar por (linea, nparte, lote) para contar pares
+                from collections import defaultdict
+                grupos = defaultdict(lambda: {'QR': 0, 'BARCODE': 0, 'ids': []})
+                
+                for row in pendientes:
+                    linea, nparte, lote, scan_format, count, ids_str = row
+                    key = (linea, nparte, lote)
+                    
+                    if scan_format == 'PAIR':
+                        # PAIR = pieza completa (QR+BARCODE ya vinculados)
+                        grupos[key]['PAIR'] = grupos[key].get('PAIR', 0) + count
+                    elif scan_format in ('QR', 'BARCODE'):
+                        # Scans individuales que necesitan su complemento
+                        grupos[key][scan_format] = count
+                    else:
+                        # Si no tiene scan_format o es desconocido, lo contamos genérico
+                        grupos[key]['GENERIC'] = grupos[key].get('GENERIC', 0) + count
+                    
+                    # Guardar IDs para marcar como aplicados
+                    if ids_str:
+                        grupos[key]['ids'].extend(ids_str.split(','))
+                
+                aplicados_total = 0
+                incompletos_summary = {}  # Para consolidar mensajes de scans incompletos
+                
+                for (linea, nparte, lote), info in grupos.items():
+                    qr_count = info.get('QR', 0)
+                    bc_count = info.get('BARCODE', 0)
+                    pair_count = info.get('PAIR', 0)  # Piezas ya completas
+                    generic_count = info.get('GENERIC', 0)
+                    
+                    # Calcular pares completos:
+                    # 1. PAIR = piezas ya completas (QR+BC vinculados cuando no había plan)
+                    # 2. min(QR, BC) = pares que se pueden formar con scans sueltos
+                    # 3. GENERIC = scans sin formato (legacy)
+                    pares_completos = pair_count + min(qr_count, bc_count) + generic_count
+                    
+                    if pares_completos == 0:
+                        # Consolidar por nparte (sumar QR y BC de todos los lotes)
+                        if nparte not in incompletos_summary:
+                            incompletos_summary[nparte] = {'QR': 0, 'BC': 0, 'PAIR': 0, 'lotes': 0}
+                        incompletos_summary[nparte]['QR'] += qr_count
+                        incompletos_summary[nparte]['BC'] += bc_count
+                        incompletos_summary[nparte]['PAIR'] += pair_count
+                        incompletos_summary[nparte]['lotes'] += 1
+                        continue
+                    
+                    try:
+                        # Buscar si ahora existe un plan para este nparte
+                        plan_row = conn.execute("""
+                            SELECT id, produced_count
+                            FROM plan_local
+                            WHERE line = ? AND part_no = ?
+                            AND (? IS NULL OR lot_no = ?)
+                            AND status IN ('PAUSADO', 'EN PROGRESO')
+                            ORDER BY 
+                                CASE WHEN status = 'EN PROGRESO' THEN 0 ELSE 1 END,
+                                sequence ASC
+                            LIMIT 1
+                        """, (linea, nparte, lote, lote)).fetchone()
+                        
+                        if plan_row:
+                            plan_id, produced_count = plan_row
+                            
+                            # Incrementar produced_count por PARES COMPLETOS solamente
+                            nuevo_produced = produced_count + pares_completos
+                            conn.execute("""
+                                UPDATE plan_local
+                                SET produced_count = ?,
+                                    updated_at = ?
+                                WHERE id = ?
+                            """, (nuevo_produced, datetime.now(ZoneInfo(settings.TZ)).isoformat(), plan_id))
+                            
+                            # Marcar TODOS los scans de este grupo como aplicados
+                            for fallback_id in info['ids']:
+                                conn.execute("""
+                                    UPDATE scans_sin_plan
+                                    SET aplicado = 1,
+                                        aplicado_a_plan_id = ?,
+                                        aplicado_at = ?
+                                    WHERE id = ?
+                                """, (plan_id, datetime.now(ZoneInfo(settings.TZ)).isoformat(), int(fallback_id)))
+                            
+                            aplicados_total += pares_completos
+                            logger.info(f"✅ Scans pendientes aplicados: Plan {plan_id} ({nparte}) +{pares_completos} piezas (QR:{qr_count}, BC:{bc_count}, PAIR:{pair_count}) → {nuevo_produced}")
+                            
+                            # También agregar al buffer para sync a MySQL
+                            self._plan_produced_buffer[plan_id] = self._plan_produced_buffer.get(plan_id, 0) + pares_completos
+                        else:
+                            logger.debug(f"⏳ Sin plan activo para {nparte} (lote: {lote})")
+                    
+                    except Exception as e:
+                        logger.error(f"Error aplicando scans pendientes para {nparte}: {e}")
+                        continue
+                
+                # Log consolidado de scans incompletos (UNA SOLA VEZ por nparte)
+                if incompletos_summary:
+                    logger.debug("⏳ Resumen de scans incompletos (esperando complemento):")
+                    for nparte, stats in incompletos_summary.items():
+                        logger.debug(f"   • {nparte}: QR={stats['QR']}, BC={stats['BC']}, PAIR={stats['PAIR']} ({stats['lotes']} lotes diferentes)")
+                
+                if aplicados_total > 0:
+                    logger.warning(f"🎉 SCANS RECUPERADOS: {aplicados_total} piezas aplicadas a planes activos")
+                else:
+                    logger.debug(f"⏳ Scans aún esperando plan compatible")
+                
+                conn.commit()
+        
+        except Exception as e:
+            logger.error(f"Error en _aplicar_scans_pendientes: {e}")
+    
+    def get_scans_sin_plan_count(self, linea: str = None) -> int:
+        """
+        Obtiene el número de scans pendientes de aplicar (sin plan activo).
+        
+        Args:
+            linea: Línea específica (opcional). Si no se proporciona, cuenta todos.
+        
+        Returns:
+            Número de scans pendientes
+        """
+        try:
+            with self._get_sqlite_connection(timeout=1.0) as conn:
+                if linea:
+                    cursor = conn.execute("""
+                        SELECT COUNT(*) FROM scans_sin_plan
+                        WHERE aplicado = 0 AND linea = ?
+                    """, (linea,))
+                else:
+                    cursor = conn.execute("""
+                        SELECT COUNT(*) FROM scans_sin_plan
+                        WHERE aplicado = 0
+                    """)
+                
+                result = cursor.fetchone()
+                return result[0] if result else 0
+        except Exception as e:
+            logger.error(f"Error obteniendo scans sin plan: {e}")
+            return 0
 
+
+    def sync_before_shutdown(self) -> dict:
+        """
+         SINCRONIZACIÓN FINAL antes de cerrar el programa
+        
+        Verifica y sincroniza todos los datos pendientes con MySQL:
+        - Incrementos de producción pendientes
+        - Scans en SQLite que no estén en MySQL
+        - Totales de producción desincronizados
+        
+        Returns:
+            dict: Resumen de la sincronización con contadores
+        """
+        logger.info(" INICIANDO SINCRONIZACIÓN FINAL ANTES DE CERRAR...")
+        result = {
+            'scans_synced': 0,
+            'increments_synced': 0,
+            'production_synced': 0,
+            'errors': []
+        }
+        
+        try:
+            # 1. Sincronizar incrementos pendientes en direct_mysql
+            try:
+                if hasattr(self, '_direct_mysql') and self._direct_mysql:
+                    logger.info(" Sincronizando incrementos pendientes...")
+                    self._direct_mysql.sync_pending_increments()
+                    pending_queue = getattr(self._direct_mysql, '_sync_queue', [])
+                    result['increments_synced'] = len(pending_queue)
+                    if result['increments_synced'] > 0:
+                        logger.info(f" {result['increments_synced']} incrementos sincronizados")
+            except Exception as e:
+                error_msg = f"Error sincronizando incrementos: {e}"
+                logger.error(error_msg)
+                result['errors'].append(error_msg)
+            
+            # 2. Verificar scans en SQLite que no estén en MySQL
+            try:
+                logger.info(" Verificando scans pendientes de sincronizar...")
+                with self._get_sqlite_connection(timeout=5.0) as conn:
+                    today = datetime.now(ZoneInfo("America/Monterrey")).strftime("%Y-%m-%d")
+                    
+                    local_cursor = conn.execute("SELECT COUNT(*) FROM scans_local WHERE DATE(ts) = ?", (today,))
+                    local_count = local_cursor.fetchone()[0]
+                    
+                    logger.info(f" Scans locales hoy: {local_count}")
+                    
+                    from ..db import get_db
+                    db = get_db()
+                    with db.get_connection() as mysql_conn:
+                        with mysql_conn.cursor() as mysql_cursor:
+                            mysql_cursor.execute("SELECT COUNT(*) FROM scans WHERE DATE(ts) = %s", (today,))
+                            mysql_count = mysql_cursor.fetchone()[0]
+                            
+                            logger.info(f" Scans en MySQL hoy: {mysql_count}")
+                            
+                            if local_count > mysql_count:
+                                diff = local_count - mysql_count
+                                logger.warning(f"  Faltan {diff} scans en MySQL. Sincronizando...")
+                                
+                                local_scans = conn.execute("""
+                                    SELECT id, raw, nparte, linea, ts, modelo, scan_format, plan_id, barcode_sequence
+                                    FROM scans_local WHERE DATE(ts) = ? ORDER BY ts DESC LIMIT ?
+                                """, (today, diff)).fetchall()
+                                
+                                for scan in local_scans:
+                                    try:
+                                        mysql_cursor.execute("""
+                                            INSERT INTO scans (raw, nparte, linea, ts, modelo, scan_format, plan_id, barcode_sequence)
+                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                            ON DUPLICATE KEY UPDATE id=id
+                                        """, scan[1:])
+                                        result['scans_synced'] += 1
+                                    except Exception:
+                                        pass
+                                
+                                mysql_conn.commit()
+                                logger.info(f" {result['scans_synced']} scans sincronizados a MySQL")
+                            else:
+                                logger.info(" Todos los scans están sincronizados")
+                    
+            except Exception as e:
+                error_msg = f"Error sincronizando scans: {e}"
+                logger.error(error_msg)
+                result['errors'].append(error_msg)
+            
+            # 3. Sincronizar totales de producción
+            try:
+                logger.info(" Verificando totales de producción...")
+                with self._get_sqlite_connection(timeout=5.0) as conn:
+                    today = datetime.now(ZoneInfo("America/Monterrey")).strftime("%Y-%m-%d")
+                    
+                    local_totals = conn.execute("""
+                        SELECT plan_id, produced_count FROM production_totals_local WHERE fecha = ?
+                    """, (today,)).fetchall()
+                    
+                    if local_totals:
+                        from ..db import get_db
+                        db = get_db()
+                        with db.get_connection() as mysql_conn:
+                            with mysql_conn.cursor() as mysql_cursor:
+                                for plan_id, local_produced in local_totals:
+                                    mysql_cursor.execute("SELECT produced_count FROM plan_main WHERE id = %s", (plan_id,))
+                                    mysql_result = mysql_cursor.fetchone()
+                                    
+                                    if mysql_result:
+                                        mysql_produced = mysql_result[0] or 0
+                                        if local_produced > mysql_produced:
+                                            diff = local_produced - mysql_produced
+                                            logger.warning(f"  Plan {plan_id}: Local={local_produced}, MySQL={mysql_produced} (diff={diff})")
+                                            
+                                            mysql_cursor.execute("""
+                                                UPDATE plan_main SET produced_count = %s, updated_at = NOW() WHERE id = %s
+                                            """, (local_produced, plan_id))
+                                            result['production_synced'] += 1
+                                
+                                mysql_conn.commit()
+                                if result['production_synced'] > 0:
+                                    logger.info(f" {result['production_synced']} totales de producción sincronizados")
+                    else:
+                        logger.info(" No hay totales pendientes de sincronizar")
+                        
+            except Exception as e:
+                error_msg = f"Error sincronizando producción: {e}"
+                logger.error(error_msg)
+                result['errors'].append(error_msg)
+            
+            total_synced = result['scans_synced'] + result['increments_synced'] + result['production_synced']
+            if total_synced > 0:
+                logger.info(f" SINCRONIZACIÓN COMPLETADA: {total_synced} registros sincronizados")
+            else:
+                logger.info(" SINCRONIZACIÓN COMPLETADA: Todo estaba sincronizado")
+            
+            if result['errors']:
+                logger.warning(f"  {len(result['errors'])} errores durante sincronización")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f" Error en sincronización final: {e}")
+            result['errors'].append(str(e))
+            return result
 # Instancia global del sistema dual
 _dual_db_instance = None
 _dual_db_lock = threading.Lock()
