@@ -1470,14 +1470,33 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Obtener línea actual
                 linea = self._selected_line if hasattr(self, '_selected_line') and self._selected_line else "N/A"
                 
+                # Guardar en SQLite local
                 with dual_db._get_sqlite_connection(timeout=2.0) as conn:
                     conn.execute("""
                         INSERT INTO scan_errors (raw, nparte, linea, scan_format, error_code, error_message, ts, fecha)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """, (raw, nparte if nparte != "N/A" else None, linea, scan_type, error_code, message, ts, fecha))
                     conn.commit()
-                    
-                logger.debug(f"Error guardado en BD: {scan_type} - {message}")
+                
+                # Enviar también a MySQL (asíncrono, no bloquea UI)
+                import threading
+                def send_to_mysql():
+                    try:
+                        dual_db.insert_error_to_mysql(
+                            raw=raw,
+                            nparte=nparte if nparte != "N/A" else None,
+                            linea=linea,
+                            scan_format=scan_type,
+                            error_code=error_code,
+                            error_message=message,
+                            ts=ts
+                        )
+                    except Exception as e:
+                        logger.error(f"Error enviando NG a MySQL: {e}")
+                
+                threading.Thread(target=send_to_mysql, daemon=True).start()
+                
+                logger.debug(f"Error guardado en BD local y enviado a MySQL: {scan_type} - {message}")
             except Exception as e:
                 logger.error(f"Error guardando error en BD: {e}")
 

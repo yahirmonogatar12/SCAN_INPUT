@@ -2070,7 +2070,49 @@ class DualDatabaseSystem:
         except Exception as e:
             logger.error(f"Error en _sync_scans_to_mysql: {e}")
             return 0
-    
+
+    def insert_error_to_mysql(self, raw: str, nparte: str, linea: str, scan_format: str, 
+                              error_code: int, error_message: str, ts: str) -> bool:
+        """
+        Inserta un error de escaneo directamente a MySQL en la tabla input_main
+        
+        Args:
+            raw: Código escaneado completo
+            nparte: Número de parte
+            linea: Línea de producción
+            scan_format: 'QR' o 'BARCODE'
+            error_code: Código de error (-8, -9, -10, etc.)
+            error_message: Mensaje descriptivo del error
+            ts: Timestamp ISO format
+            
+        Returns:
+            bool: True si se insertó correctamente
+        """
+        try:
+            from ..db import get_db
+            from datetime import datetime
+            db = get_db()
+            
+            # Convertir timestamp ISO a datetime y date
+            dt = datetime.fromisoformat(ts)
+            fecha = dt.strftime("%Y-%m-%d")
+            
+            with db.get_connection() as mysql_conn:
+                with mysql_conn.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO input_main 
+                        (raw, nparte, linea, ts, fecha, scan_format, result, error_code, error_message)
+                        VALUES (%s, %s, %s, %s, %s, %s, 'NG', %s, %s)
+                    """, (raw, nparte, linea, ts, fecha, scan_format, error_code, error_message))
+                    mysql_conn.commit()
+                    
+            logger.debug(f"Error NG enviado a MySQL: {scan_format} - {error_message}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error insertando NG a MySQL: {e}")
+            return False
+
     def _sync_totals_to_mysql(self) -> int:
         """Sincroniza totales pendientes a MySQL"""
         try:
@@ -3117,38 +3159,35 @@ class DualDatabaseSystem:
                     with db.get_connection() as mysql_conn:
                         with mysql_conn.cursor() as mysql_cursor:
                             mysql_cursor.execute("""
-                                SELECT COUNT(*) FROM scans 
+                                SELECT COUNT(*) FROM input_main
                                 WHERE DATE(ts) = %s
                             """, (today,))
                             mysql_count = mysql_cursor.fetchone()[0]
-                            
-                            logger.info(f" Scans en MySQL hoy: {mysql_count}")
-                            
-                            # Si hay diferencia, sincronizar los faltantes
+
+                            logger.info(f" Scans en MySQL hoy: {mysql_count}")                            # Si hay diferencia, sincronizar los faltantes
                             if local_count > mysql_count:
                                 diff = local_count - mysql_count
                                 logger.warning(f"  Faltan {diff} scans en MySQL. Sincronizando...")
                                 
-                                # Obtener scans locales que no estén en MySQL
+                                # Obtener scans locales con fecha incluida
                                 local_scans = conn.execute("""
-                                    SELECT id, raw, nparte, linea, ts, modelo, scan_format, 
+                                    SELECT id, raw, nparte, linea, ts, fecha, modelo, scan_format, 
                                            plan_id, barcode_sequence
-                                    FROM scans_local 
+                                    FROM scans_local
                                     WHERE DATE(ts) = ?
                                     ORDER BY ts DESC
                                     LIMIT ?
                                 """, (today, diff)).fetchall()
-                                
+
                                 # Insertar en MySQL
                                 for scan in local_scans:
                                     try:
                                         mysql_cursor.execute("""
-                                            INSERT INTO scans 
-                                            (raw, nparte, linea, ts, modelo, scan_format, 
-                                             plan_id, barcode_sequence)
-                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                            INSERT INTO input_main
+                                            (raw, nparte, linea, ts, fecha, modelo, scan_format, barcode_sequence, result)
+                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'OK')
                                             ON DUPLICATE KEY UPDATE id=id
-                                        """, scan[1:])
+                                        """, (scan[1], scan[2], scan[3], scan[4], scan[5], scan[6], scan[7], scan[9]))
                                         result['scans_synced'] += 1
                                     except Exception as e:
                                         logger.debug(f"Scan ya existe en MySQL: {scan[1]}")
@@ -3723,27 +3762,30 @@ class DualDatabaseSystem:
                     db = get_db()
                     with db.get_connection() as mysql_conn:
                         with mysql_conn.cursor() as mysql_cursor:
-                            mysql_cursor.execute("SELECT COUNT(*) FROM scans WHERE DATE(ts) = %s", (today,))
+                            mysql_cursor.execute("SELECT COUNT(*) FROM input_main WHERE DATE(ts) = %s", (today,))
                             mysql_count = mysql_cursor.fetchone()[0]
-                            
+
                             logger.info(f" Scans en MySQL hoy: {mysql_count}")
                             
                             if local_count > mysql_count:
                                 diff = local_count - mysql_count
                                 logger.warning(f"  Faltan {diff} scans en MySQL. Sincronizando...")
                                 
+                                # Obtener scans locales del día con fecha incluida
                                 local_scans = conn.execute("""
-                                    SELECT id, raw, nparte, linea, ts, modelo, scan_format, plan_id, barcode_sequence
+                                    SELECT id, raw, nparte, linea, ts, fecha, modelo, scan_format, plan_id, barcode_sequence
                                     FROM scans_local WHERE DATE(ts) = ? ORDER BY ts DESC LIMIT ?
                                 """, (today, diff)).fetchall()
-                                
+
                                 for scan in local_scans:
                                     try:
+                                        # Convertir plan_id y barcode_sequence para compatibilidad
                                         mysql_cursor.execute("""
-                                            INSERT INTO scans (raw, nparte, linea, ts, modelo, scan_format, plan_id, barcode_sequence)
-                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                            INSERT INTO input_main 
+                                            (raw, nparte, linea, ts, fecha, modelo, scan_format, barcode_sequence, result)
+                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'OK')
                                             ON DUPLICATE KEY UPDATE id=id
-                                        """, scan[1:])
+                                        """, (scan[1], scan[2], scan[3], scan[4], scan[5], scan[6], scan[7], scan[9]))
                                         result['scans_synced'] += 1
                                     except Exception:
                                         pass

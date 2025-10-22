@@ -16,6 +16,8 @@ a = Analysis(
         ('.env.example', '.'),  # ✅ Plantilla de configuración (renombrada a .env en instalación)
         ('version.txt', '.'),  # Archivo de versión para auto-actualización
         ('migrations', 'migrations'),  # ✅ Scripts SQL de migración
+        ('README.md', '.'),  # ✅ Documentación
+        ('LICENSE.txt', '.'),  # ✅ Licencia
     ],
     # ✅ NOTA: tzdata se incluye automáticamente con Python 3.11+
     # Si hay errores de zona horaria, descomentar la siguiente línea:
@@ -28,6 +30,7 @@ a = Analysis(
         'mysql.connector',
         'mysql.connector.pooling',
         'mysql.connector.cursor',
+        'mysql.connector.errors',
         'PyQt6',
         'PyQt6.QtCore',
         'PyQt6.QtGui',
@@ -53,6 +56,12 @@ a = Analysis(
         'base64',
         'cryptography',  # ✅ Para secure_config.py
         'cryptography.fernet',
+        'urllib',
+        'urllib.request',
+        'urllib.error',
+        'ssl',
+        'certifi',  # ✅ Para verificación SSL en auto-update
+        'requests',  # ✅ Si usas requests en lugar de urllib
     ],
     hookspath=[],
     hooksconfig={},
@@ -126,8 +135,14 @@ try:
             shutil.copy2('version.txt', dist_root / 'version.txt')
             print(f"✅ version.txt copiado a {dist_root}")
         
+        # Crear directorio data/ si no existe
+        data_dir = dist_root / 'data'
+        if not data_dir.exists():
+            data_dir.mkdir(parents=True)
+            print(f"✅ Directorio data/ creado en {dist_root}")
+        
         # Verificar que archivos críticos estén presentes
-        critical_files = ['CHECK.wav', 'ERROR.wav', 'logoLogIn.png', 'logoLogIn.ico']
+        critical_files = ['CHECK.wav', 'ERROR.wav', 'logoLogIn.png', 'logoLogIn.ico', 'README.md', 'LICENSE.txt']
         for file in critical_files:
             if not (dist_root / file).exists():
                 print(f"⚠️ ADVERTENCIA: {file} no encontrado en {dist_root}")
