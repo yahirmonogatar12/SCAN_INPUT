@@ -44,8 +44,8 @@ def process_scan_direct(raw: str, linea: str = "M1") -> int:
         
         if scan_id > 0:
             logger.info(f"✅ Escaneo procesado: ID {scan_id}")
-        elif scan_id == -2:
-            logger.warning(f"🚫 Duplicado bloqueado: {raw[:30]}...")
+        elif scan_id == 0:
+            logger.debug(f"� Duplicado ignorado silenciosamente: {raw[:30]}...")
         elif scan_id == -3:
             logger.warning(f"📋 Fuera de plan: {raw[:30]}...")
         elif scan_id == -4:
@@ -57,7 +57,8 @@ def process_scan_direct(raw: str, linea: str = "M1") -> int:
         elif scan_id == -10:
             logger.warning(f"🚫 Modelo diferente al plan EN PROGRESO: {raw[:30]}...")
         else:
-            logger.error(f"❌ Error procesando: {raw[:30]}...")
+            # Mostrar código de error específico para debugging
+            logger.error(f"❌ Error procesando (código {scan_id}): {raw[:30]}...")
         
         return scan_id
         

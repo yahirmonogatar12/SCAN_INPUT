@@ -2082,9 +2082,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 # ⚡ Actualizar UI en background (no bloquea)
                 QtCore.QTimer.singleShot(50, lambda: self._update_ui_after_scan(raw, linea))
                 
-            elif result == -2:
-                # Duplicado - mostrar sin sonido
-                self._show_duplicate_notification(raw)
+            elif result == 0:
+                # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificación)
+                logger.debug(f"🔇 Duplicado ignorado en UI: {raw[:30]}...")
+                pass  # No hacer nada, es normal en producción
             elif result == -3:
                 _play_error_sound()
                 self._show_plan_notification("NO EN PLAN", raw, color="#CC3333")
@@ -2547,12 +2548,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 
                 # ❌ ELIMINADO refresh_plan_only y refresh_totals_only (causaban congelamiento)
                 # ✅ El timer de 15 SEGUNDOS se encarga de actualizar automáticamente (optimizado con Dual DB)
-            elif result == -2:
-                # Duplicado detectado - NO reproducir sonido
-                if raw == self._last_processed_code:
-                    logger.debug(f"🔇 Código duplicado consecutivo ignorado (async): {raw[:20]}...")
-                    return
-                self._show_duplicate_notification(raw)
+            elif result == 0:
+                # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificación)
+                logger.debug(f"🔇 Duplicado ignorado en UI (_process_complete_qr): {raw[:30]}...")
+                pass  # No hacer nada, es normal en producción
             elif result == -3:
                 _play_error_sound()
                 self._show_plan_notification("NO EN PLAN", raw, color="#CC3333")
@@ -2671,16 +2670,12 @@ class MainWindow(QtWidgets.QMainWindow):
                     # Reset métricas de escritura tras procesar
                     self._last_char_time = 0.0
                     self._interchar_times.clear()
-                elif result == -2:
-                    # Duplicado detectado - NO reproducir sonido
-                    if raw == self._last_processed_code:
-                        logger.debug(f"🔇 Código duplicado consecutivo ignorado (pending): {raw[:20]}...")
-                        self._last_char_time = 0.0
-                        self._interchar_times.clear()
-                        return
-                    self._show_duplicate_notification(raw)
+                elif result == 0:
+                    # Duplicado - IGNORAR SILENCIOSAMENTE (sin sonido, sin notificación)
+                    logger.debug(f"🔇 Duplicado ignorado en UI (_process_pending_barcode): {raw[:30]}...")
                     self._last_char_time = 0.0
                     self._interchar_times.clear()
+                    pass  # No hacer nada, es normal en producción
                 elif result == -3:
                     _play_error_sound()
                     self._show_plan_notification("FUERA DE PLAN", raw, color="#991313")

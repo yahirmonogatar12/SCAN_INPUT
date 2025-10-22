@@ -75,6 +75,9 @@ class DualDatabaseSystem:
         # Inicializar SQLite
         self._init_sqlite()
         
+        # 🧹 AUTO-REPARACIÓN AL INICIO: Limpiar pending_scans al arrancar
+        self._cleanup_on_startup()
+        
         # 🚀 Inicializar sistema de caché de métricas
         self.metrics_cache = init_metrics_cache(self.sqlite_path)
         
@@ -281,6 +284,116 @@ class DualDatabaseSystem:
         
         logger.info("SQLite local inicializado correctamente")
     
+    def _cleanup_on_startup(self):
+        """🧹 AUTO-REPARACIÓN AL INICIAR: Limpia pending_scans al arrancar la aplicación"""
+        try:
+            with self._get_sqlite_connection(timeout=10.0) as conn:
+                # Contar registros antes de limpiar
+                cursor = conn.execute("SELECT COUNT(*) FROM pending_scans")
+                count_before = cursor.fetchone()[0]
+                
+                if count_before > 0:
+                    logger.warning(f"⚠️  INICIO: Encontrados {count_before} pending_scans de sesión anterior")
+                    
+                    # Eliminar TODOS los pending_scans (son de sesión anterior, pueden estar corruptos)
+                    conn.execute("DELETE FROM pending_scans")
+                    conn.commit()
+                    
+                    logger.warning(f"🧹 AUTO-REPARACIÓN: Limpiados {count_before} pending_scans al iniciar")
+                else:
+                    logger.info("✅ pending_scans limpio al iniciar")
+        except Exception as e:
+            logger.error(f"Error en cleanup_on_startup: {e}", exc_info=True)
+
+    def cleanup_orphaned_scans_manual(self, linea: Optional[str] = None, force_all: bool = False) -> int:
+        """🚨 FUNCIÓN DE EMERGENCIA: Limpieza MANUAL de pending_scans
+        
+        Esta función puede ser llamada desde la UI o herramientas de diagnóstico.
+        
+        Args:
+            linea: Línea específica a limpiar (None = todas)
+            force_all: Si True, elimina TODOS sin importar edad (emergencia total)
+            
+        Returns:
+            Número de registros eliminados
+        """
+        try:
+            with self._get_sqlite_connection(timeout=10.0) as conn:
+                if force_all:
+                    # EMERGENCIA TOTAL: Eliminar TODO
+                    if linea:
+                        deleted = conn.execute("DELETE FROM pending_scans WHERE linea = ?", (linea,))
+                    else:
+                        deleted = conn.execute("DELETE FROM pending_scans")
+                    
+                    count = deleted.rowcount
+                    logger.warning(f"🚨 LIMPIEZA FORZADA MANUAL: Eliminados {count} pending_scans (linea={linea or 'TODAS'})")
+                else:
+                    # Limpieza normal (>30s)
+                    from datetime import datetime as dt, timedelta
+                    thirty_secs_ago = (dt.now(ZoneInfo(settings.TZ)) - 
+                                     timedelta(seconds=30)).isoformat()
+                    
+                    if linea:
+                        deleted = conn.execute("""
+                            DELETE FROM pending_scans 
+                            WHERE ts < ? AND linea = ?
+                        """, (thirty_secs_ago, linea))
+                    else:
+                        deleted = conn.execute("""
+                            DELETE FROM pending_scans 
+                            WHERE ts < ?
+                        """, (thirty_secs_ago,))
+                    
+                    count = deleted.rowcount
+                    if count > 0:
+                        logger.warning(f"🧹 LIMPIEZA MANUAL: Eliminados {count} pending_scans >30s (linea={linea or 'TODAS'})")
+                
+                conn.commit()
+                return count
+        except Exception as e:
+            logger.error(f"Error en cleanup_orphaned_scans_manual: {e}", exc_info=True)
+            return 0
+
+    def get_pending_scans_status(self) -> dict:
+        """📊 DIAGNÓSTICO: Obtiene el estado actual de pending_scans
+        
+        Returns:
+            Dict con estadísticas de pending_scans por línea y edad
+        """
+        try:
+            with self._get_sqlite_connection(timeout=5.0) as conn:
+                cursor = conn.execute("""
+                    SELECT linea, scan_format, COUNT(*) as count,
+                           MIN(CAST((julianday('now') - julianday(ts)) * 86400 AS INTEGER)) as min_age_secs,
+                           MAX(CAST((julianday('now') - julianday(ts)) * 86400 AS INTEGER)) as max_age_secs,
+                           AVG(CAST((julianday('now') - julianday(ts)) * 86400 AS INTEGER)) as avg_age_secs
+                    FROM pending_scans
+                    GROUP BY linea, scan_format
+                """)
+                
+                rows = cursor.fetchall()
+                result = {
+                    "total_records": sum(r[2] for r in rows),
+                    "by_line": {}
+                }
+                
+                for linea, fmt, count, min_age, max_age, avg_age in rows:
+                    if linea not in result["by_line"]:
+                        result["by_line"][linea] = {}
+                    
+                    result["by_line"][linea][fmt] = {
+                        "count": count,
+                        "min_age_seconds": min_age,
+                        "max_age_seconds": max_age,
+                        "avg_age_seconds": round(avg_age, 1)
+                    }
+                
+                return result
+        except Exception as e:
+            logger.error(f"Error en get_pending_scans_status: {e}", exc_info=True)
+            return {"total_records": 0, "by_line": {}, "error": str(e)}
+
     @contextlib.contextmanager
     def _get_sqlite_connection(self, timeout: float = 5.0, check_same_thread: bool = True):
         """
@@ -693,8 +806,8 @@ class DualDatabaseSystem:
 
         Códigos de retorno:
             >0  id staging (éxito; si par completo ya se insertó en final)
+            0   duplicado IGNORADO silenciosamente (sin mostrar error al operador)
             -1  error general / parseo
-            -2  duplicado
             -3  parte fuera de plan (no existe en plan del día para la línea)
             -4  plan completo (plan_count alcanzado para esa parte en la línea)
             -5  se intentó escanear dos veces el mismo formato consecutivamente (falta par complementario)
@@ -702,6 +815,26 @@ class DualDatabaseSystem:
             -7  SUB ASSY: BARCODE no coincide con QR según tabla raw (solo en modo SUB ASSY)
         """
         try:
+            # 🧹 PASO 0: LIMPIAR pending_scans antiguos (>30s) ANTES DE TODO
+            # Esto previene que QRs/BARCODEs huérfanos bloqueen nuevos escaneos
+            try:
+                with self._get_sqlite_connection(timeout=2.0) as conn_clean:
+                    from datetime import datetime as dt, timedelta
+                    thirty_secs_ago = (dt.now(ZoneInfo(settings.TZ)) - 
+                                     timedelta(seconds=30)).isoformat()
+                    
+                    deleted = conn_clean.execute("""
+                        DELETE FROM pending_scans 
+                        WHERE ts < ? AND linea = ?
+                    """, (thirty_secs_ago, linea))
+                    
+                    deleted_count = deleted.rowcount
+                    if deleted_count > 0:
+                        logger.warning(f"🧹 Limpiados {deleted_count} pending_scans huérfanos (>30s) en línea {linea}")
+                    conn_clean.commit()
+            except Exception as e:
+                logger.debug(f"Error limpiando pending_scans antiguos: {e}")
+            
             # Parsear escaneo (detecta automáticamente QR o BARCODE)
             parsed = parse_scan(raw)
             
@@ -712,11 +845,11 @@ class DualDatabaseSystem:
             else:
                 scan_record = parsed
             
-            # 1) Duplicados primero (staging + final), para informar correctamente
+            # 1) Duplicados primero (staging + final) - IGNORAR SILENCIOSAMENTE
             if self._check_duplicate_everywhere(scan_record):
                 format_name = getattr(parsed, 'scan_format', 'QR')
-                logger.warning(f"🚫 Escaneo {format_name} duplicado detectado: {raw}")
-                return -2
+                logger.debug(f"� Escaneo {format_name} duplicado ignorado silenciosamente: {raw[:30]}...")
+                return 0  # Retorna 0 para que UI lo ignore sin mostrar error
 
             # 2) Validación de PLAN (solo si no es duplicado)
             nparte_plan = getattr(scan_record, 'nparte', None)
@@ -982,19 +1115,23 @@ class DualDatabaseSystem:
                 logger.info(f"✅ SOLO QR: Par completo insertado para {scan_record.nparte} (BARCODE='SOLO QR')")
                 return qr_final_id
 
-            # 3) Regla de mismo formato consecutivo por LÍNEA (nunca permitir BARCODE→BARCODE ni QR→QR)
+            # 3) Validar si es duplicado EXACTO en pending_scans (mismo nparte + secuencia)
+            # Permitir múltiples QRs/BARCODEs siempre que sean DIFERENTES piezas
             scan_format = getattr(parsed, 'scan_format', 'QR')
             try:
                 # ⚡ USAR HELPER THREAD-SAFE para evitar "database is locked"
                 with self._get_sqlite_connection(timeout=1.0) as conn_chk:
+                        # Verificar si hay pending del MISMO formato Y MISMO nparte Y MISMA secuencia
+                        scan_secuencia = getattr(scan_record, 'secuencia', 0)
                         cur_chk = conn_chk.execute("""
                             SELECT COUNT(*) FROM pending_scans
-                            WHERE linea=? AND scan_format=?
-                        """, (linea, scan_format))
-                        pending_same = cur_chk.fetchone()[0]
-                        if pending_same > 0:
-                            # Ya hay uno del mismo formato en espera: exigir el complemento
-                            return -5
+                            WHERE linea=? AND scan_format=? AND nparte=? AND secuencia=?
+                        """, (linea, scan_format, scan_record.nparte, scan_secuencia))
+                        pending_exact = cur_chk.fetchone()[0]
+                        if pending_exact > 0:
+                            # Ya hay uno IDÉNTICO en espera - es duplicado real
+                            logger.debug(f"🔇 Código duplicado en pending: {raw[:30]}...")
+                            return 0  # Duplicado - ignorar silenciosamente
             except Exception:
                 pass  # En error no bloqueamos regla para no frenar operación
             
@@ -1004,7 +1141,8 @@ class DualDatabaseSystem:
             barcode_sequence = getattr(parsed, 'secuencia', None) if scan_format == 'BARCODE' else None
             
             # ⚡ USAR HELPER THREAD-SAFE para evitar "database is locked"
-            with self._get_sqlite_connection(timeout=2.0) as conn:
+            # TIMEOUT AUMENTADO: 5s para evitar fallos cuando sync worker está activo
+            with self._get_sqlite_connection(timeout=5.0) as conn:
                 # 🔄 PASO 1: Guardar en STAGING (temporal) - NO en tabla final
                 # Usar la fecha REAL parseada del QR (fecha_iso) si existe; esto es crítico para detectar duplicados correctamente.
                 parsed_fecha = getattr(scan_record, 'fecha_iso', None)
@@ -1074,10 +1212,25 @@ class DualDatabaseSystem:
                 logger.warning(f"🚫 Escaneo duplicado bloqueado: {raw}")
                 return -2
             else:
-                logger.error(f"Error de integridad: {e}")
+                logger.error(f"❌ Error de integridad SQL: {e}")
+                return -1
+        except sqlite3.OperationalError as e:
+            # Error específico de SQLite (database locked, timeout, etc.)
+            if "locked" in str(e).lower() or "timeout" in str(e).lower():
+                logger.warning(f"⏳ SQLite ocupado, reintentando... ({raw[:30]}...)")
+                # Esperar un poco y reintentar UNA vez
+                time.sleep(0.1)
+                try:
+                    return self.add_scan_fast(raw, linea)  # Reintentar
+                except Exception as retry_err:
+                    logger.error(f"❌ Fallo después de reintento: {retry_err}")
+                    return -1
+            else:
+                logger.error(f"❌ Error SQLite en add_scan_fast: {e}", exc_info=True)
                 return -1
         except Exception as e:
-            logger.error(f"Error en add_scan_fast: {e}")
+            # Loguear el error completo con traceback para debugging
+            logger.error(f"❌ Error en add_scan_fast procesando '{raw[:50]}...': {e}", exc_info=True)
             return -1
     
     def _try_auto_link(self, conn, new_scan_id: int, nparte: str, linea: str, scan_format: str, modelo: str = None) -> bool:
@@ -1432,12 +1585,35 @@ class DualDatabaseSystem:
                 # Verificar si hay planes inactivos para pausar automáticamente
                 self._auto_pause_inactive_plans()
 
-                # Dormir según la carga
-                time.sleep(3)  # Sincronizar cada 3 segundos
+                # 🧹 AUTO-REPARACIÓN: Limpieza periódica de pending_scans huérfanos (cada 5 minutos)
+                last_cleanup = getattr(self, '_last_cleanup', 0)
+                if now - last_cleanup > 300:  # 5 minutos = 300 segundos
+                    try:
+                        with self._get_sqlite_connection(timeout=5.0) as conn:
+                            from datetime import datetime as dt, timedelta
+                            thirty_secs_ago = (dt.now(ZoneInfo(settings.TZ)) - 
+                                             timedelta(seconds=30)).isoformat()
+                            
+                            deleted = conn.execute("""
+                                DELETE FROM pending_scans 
+                                WHERE ts < ?
+                            """, (thirty_secs_ago,))
+                            
+                            count = deleted.rowcount
+                            if count > 0:
+                                logger.warning(f"🧹 AUTO-REPARACIÓN: Limpiados {count} pending_scans huérfanos (limpieza periódica)")
+                            conn.commit()
+                            
+                        self._last_cleanup = now
+                    except Exception as e_cleanup:
+                        logger.debug(f"Error en limpieza periódica: {e_cleanup}")
+
+                # Dormir según la carga (AUMENTADO a 5s para reducir contención)
+                time.sleep(5)  # Sincronizar cada 5 segundos (menos presión en SQLite)
                 
             except Exception as e:
                 logger.error(f"❌ Error en sync worker (ciclo #{cycle_count}): {e}", exc_info=True)
-                time.sleep(10)  # Esperar más tiempo en caso de error
+                time.sleep(15)  # Esperar más tiempo en caso de error (AUMENTADO)
         
         logger.warning("🛑 Sync worker loop terminado")
     
@@ -1550,14 +1726,20 @@ class DualDatabaseSystem:
                         else:
                             db.insert_pair_scan(pair_data)
                     except Exception as ie:
-                        logger.error(f"Error insertando par consolidado MySQL id_local={scan_row['id']}: {ie}")
-                        # Marcar como sincronizados para no reintentar si el error no es recuperable
-                        try:
-                            with self._get_sqlite_connection() as conn_err:
-                                conn_err.execute("UPDATE scans_local SET synced_to_mysql = 1 WHERE id IN (?,?)", (scan_row['id'], linked_scan_id))
-                                conn_err.commit()
-                        except Exception:
-                            pass
+                        logger.error(f"❌ Error insertando par consolidado MySQL id_local={scan_row['id']}: {ie}")
+                        # NO marcar como sincronizado - reintentar en próximo ciclo
+                        # Solo marcar si es error de duplicado (que significa que ya existe en MySQL)
+                        error_msg = str(ie).lower()
+                        if 'duplicate' in error_msg or 'unique constraint' in error_msg:
+                            logger.warning(f"⚠️ Duplicado en MySQL para id_local={scan_row['id']}, marcando como sincronizado")
+                            try:
+                                with self._get_sqlite_connection() as conn_err:
+                                    conn_err.execute("UPDATE scans_local SET synced_to_mysql = 1 WHERE id IN (?,?)", (scan_row['id'], linked_scan_id))
+                                    conn_err.commit()
+                            except Exception:
+                                pass
+                        # Para otros errores (conexión, timeout, etc.) NO marcar como sincronizado
+                        # Se reintentará en el próximo ciclo (cada 3 segundos)
                         continue
 
                     # Actualizar producción diaria (cantidad=1 pieza)
