@@ -509,9 +509,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.action_db_config.triggered.connect(self.configure_db_location)
         
         admin_menu.addSeparator()
-        
-        # Opcií³n de configuracií³n general
-        self.action_configuracion = admin_menu.addAction("Configuracií³n")
+
+        # Opción de configuración general
+        self.action_configuracion = admin_menu.addAction("Configuracion")
         self.action_configuracion.triggered.connect(self.open_configuracion)
 
         # Conexiones simplificadas
@@ -1467,8 +1467,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 elif "SIN PLAN ACTIVO" in message:
                     error_code = -11
                 
-                # Obtener línea actual
-                linea = self._selected_line if hasattr(self, '_selected_line') and self._selected_line else "N/A"
+                # Obtener línea actual desde el selector (SIEMPRE tiene un valor)
+                linea = self.linea_selector.currentText() if hasattr(self, 'linea_selector') else "N/A"
+                logger.debug(f"💾 Guardando error NG en línea: {linea}")
                 
                 # Guardar en SQLite local
                 with dual_db._get_sqlite_connection(timeout=2.0) as conn:
@@ -2351,16 +2352,20 @@ class MainWindow(QtWidgets.QMainWindow):
                         t0 = t1 - datetime.timedelta(minutes=60)
                         
                         # Usar mí©todo optimizado del dual_db (lee de SQLite local)
+                        # Usar fecha actual para filtro
+                        fecha_hoy = ahora.strftime("%Y-%m-%d")
+                        
                         try:
                             with dual_db._get_sqlite_connection(timeout=0.5) as conn:
+                                # ✅ CORREGIDO: Usar datetime() de SQLite para comparación correcta
                                 cursor = conn.execute("""
                                     SELECT COUNT(*)/2 as N
                                     FROM scans_local 
                                     WHERE linea = ? 
-                                    AND ts >= ? 
-                                    AND ts <= ?
+                                    AND fecha = ?
+                                    AND datetime(ts) >= datetime('now', '-1 hour')
                                     AND is_complete = 1
-                                """, (linea_seleccionada, t0.isoformat(), t1.isoformat()))
+                                """, (linea_seleccionada, fecha_hoy))
                                 result_row = cursor.fetchone()
                                 N = int(result_row[0]) if result_row and result_row[0] else 0
                                 
@@ -3244,35 +3249,63 @@ class MainWindow(QtWidgets.QMainWindow):
                 except Exception as e:
                     logger.debug(f"Error actualizando tabla: {e}")
                 
-                # Actualizar cache de mí©tricas
+                # Actualizar cache de métricas CON RECALCULO DE UPH Y UPPH
                 try:
                     from ..services.metrics_cache import get_metrics_cache
                     from datetime import date
+                    import datetime as dt
                     
                     metrics_cache = get_metrics_cache()
                     if metrics_cache:
                         fecha_hoy = date.today().isoformat()
                         cached = metrics_cache.get_metrics_from_cache(linea, fecha_hoy)
                         if cached:
+                            # Incrementar producción
                             cached['produccion_real'] += 1
+                            
+                            # Recalcular eficiencia
                             if cached['plan_acumulado'] > 0:
                                 cached['eficiencia'] = (cached['produccion_real'] / cached['plan_acumulado']) * 100
+                            
+                            # ✅ RECALCULAR UPH desde SQLite (última hora)
+                            try:
+                                from ..services.dual_db import get_dual_db
+                                dual_db = get_dual_db()
+                                
+                                # Obtener fecha actual
+                                ahora = dt.datetime.now()
+                                fecha_hoy = ahora.strftime("%Y-%m-%d")
+                                
+                                with dual_db._get_sqlite_connection(timeout=0.5) as conn:
+                                    # ✅ Usar datetime() de SQLite para comparación correcta
+                                    cursor = conn.execute("""
+                                        SELECT COUNT(*)/2 as N
+                                        FROM scans_local 
+                                        WHERE linea = ? 
+                                        AND fecha = ?
+                                        AND datetime(ts) >= datetime('now', '-1 hour')
+                                        AND is_complete = 1
+                                    """, (linea, fecha_hoy))
+                                    result_row = cursor.fetchone()
+                                    uph_recalculado = int(result_row[0]) if result_row and result_row[0] else 0
+                                    
+                                    cached['uph'] = float(uph_recalculado)
+                                    
+                                    # ✅ RECALCULAR UPPH
+                                    num_personas = cached.get('num_personas', 6)
+                                    if num_personas > 0:
+                                        cached['upph'] = cached['uph'] / num_personas
+                                    else:
+                                        cached['upph'] = 0.0
+                                    
+                                    logger.debug(f"🔄 UPH recalculado: {uph_recalculado}, UPPH: {cached['upph']:.2f}")
+                                    
+                            except Exception as e_uph:
+                                logger.debug(f"⚠️ Error recalculando UPH: {e_uph}")
+                            
+                            # Actualizar cache con valores recalculados
                             metrics_cache.update_metrics_instant(linea, fecha_hoy, cached)
                             
-                            # âš ï¸ NO actualizar cards desde cachí© - ahora usamos cálculo directo desde SQLite
-                            # El timer de _update_plan_totals() se encarga de actualizar las tarjetas
-                            # correctamente con el cálculo de tiempo transcurrido
-                            
-                            # Cí“DIGO VIEJO (DESHABILITADO):
-                            # if self.linea_selector.currentText() == linea:
-                            #     self._update_cards_with_metrics(
-                            #         cached['plan_total'],
-                            #         cached['plan_acumulado'],  # âŒ Este valor es INCORRECTO (no usa tiempo transcurrido)
-                            #         cached['produccion_real'],
-                            #         cached['eficiencia'],
-                            #         cached['uph'],
-                            #         cached['upph']
-                            #     )
                 except Exception as e:
                     logger.debug(f"Error actualizando cache: {e}")
         except Exception as e:
@@ -4448,16 +4481,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.status_dual.setStyleSheet("color: #aa0000; font-size: 11px;")
 
     def force_table_refresh(self):
-        """Fuerza el refresh completo de las tablas tras cambio de configuracií³n"""
+        """Fuerza el refresh completo de las tablas tras cambio de configuración"""
         try:
             # Usar logging básico si el personalizado falla
             try:
                 from ..logging_config import get_logger
                 logger = get_logger(__name__)
-                logger.info("Forzando refresh de tablas tras cambio de configuracií³n")
+                logger.info("Forzando refresh de tablas tras cambio de configuración")
             except (ImportError, Exception):
-                print("Forzando refresh de tablas tras cambio de configuracií³n")
-            
+                print("Forzando refresh de tablas tras cambio de configuración")
+
             # Leer valores actualizados directamente del .env y actualizar settings
             from pathlib import Path
             
@@ -5045,12 +5078,12 @@ class MainWindow(QtWidgets.QMainWindow):
             # Mí©todo deshabilitado - sistema optimizado usa solo MySQL directo
             QtWidgets.QMessageBox.information(
                 self,
-                "Configuracií³n no disponible",
-                "El sistema optimizado usa MySQL directo.\nNo requiere configuracií³n de base de datos local."
+                "Configuración no disponible",
+                "El sistema optimizado usa MySQL directo.\nNo requiere configuración de base de datos local."
             )
             return
-            
-            # Cí³digo legacy comentado:
+
+            # Código legacy comentado:
             # dual_db = get_dual_db()
             # current_path = dual_db.sqlite_path
             current_dir = os.path.dirname(current_path)
@@ -5118,15 +5151,15 @@ class MainWindow(QtWidgets.QMainWindow):
         return
 
     def open_configuracion(self) -> None:
-        """Abrir diálogo de configuracií³n general del sistema"""
+        """Abrir diálogo de configuración general del sistema"""
         try:
-            # Crear diálogo de configuracií³n
+            # Crear diálogo de configuración
             dialog = ConfiguracionDialog(self)
             dialog.exec()
-            
-            # Actualizar totales despuí©s de cualquier cambio
+
+            # Actualizar totales después de cualquier cambio
             self.refresh_totals_only()
-            # Aplicar lí­nea por defecto actualizada si cambií³
+            # Aplicar línea por defecto actualizada si cambió
             try:
                 from ..config import settings as _settings
                 # Rellenar opciones por modo actual
@@ -5143,7 +5176,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
             
         except Exception as e:
-            QtWidgets.QMessageBox.warning(self, "Error", f"Error abriendo configuracií³n: {e}")
+            QtWidgets.QMessageBox.warning(self, "Error", f"Error abriendo configuración: {e}")
 
     def toggle_fullscreen_mode(self) -> None:
         """Alternar entre modo pantalla completa y modo normal"""
@@ -5188,9 +5221,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.logo_label.show()
             self.logo_label.raise_()  # Traer al frente
         
-        # Modificar el tí­tulo del plan - incluir informacií³n de la lí­nea actual
+        # Modificar el título del plan - incluir información de la línea actual
         linea_actual = self.linea_selector.currentText() if hasattr(self, 'linea_selector') else "N/A"
-        self.title_plan.setText(f"PLAN DE PRODUCCIí“N - LíNEA {linea_actual} - ESCANEO ACTIVO")
+        self.title_plan.setText(f"PLAN DE PRODUCCION - LÍNEA {linea_actual} - ESCANEO ACTIVO")
         self.title_plan.setStyleSheet("""
             font-weight: bold; 
             font-size: 24px; 
@@ -5260,12 +5293,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # Mostrar la barra de meníº y status
         self.menuBar().show()
         self.statusBar().show()
-        
-        # Restaurar tí­tulo del plan
-        self.title_plan.setText("Plan de Produccií³n (Lí­nea Seleccionada)")
+
+        # Restaurar título del plan
+        self.title_plan.setText("Plan de Produccion (Línea Seleccionada)")
         self.title_plan.setStyleSheet("font-weight: bold; margin-top:8px;")
         
-        # Restaurar tamaí±o de fuente de la tabla
+        # Restaurar tamaño de fuente de la tabla
         self.table_plan.setStyleSheet("""
             QTableWidget {font-size:14px; gridline-color:#2d3e50;}
             QHeaderView::section {background:#1f2d3a; color:#e0e0e0; font-weight:bold; font-size:13px; padding:4px;}

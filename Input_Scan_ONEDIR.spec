@@ -13,11 +13,9 @@ a = Analysis(
         ('logoLogIn.ico', '.'),
         ('CHECK.wav', '.'),
         ('ERROR.wav', '.'),
-        ('.env.example', '.'),  # ✅ Plantilla de configuración (renombrada a .env en instalación)
+        ('.env.example', '.'),  # Plantilla de configuración
         ('version.txt', '.'),  # Archivo de versión para auto-actualización
-        ('migrations', 'migrations'),  # ✅ Scripts SQL de migración
-        ('README.md', '.'),  # ✅ Documentación
-        ('LICENSE.txt', '.'),  # ✅ Licencia
+        ('migrations', 'migrations'),  # Scripts SQL de migración
     ],
     # ✅ NOTA: tzdata se incluye automáticamente con Python 3.11+
     # Si hay errores de zona horaria, descomentar la siguiente línea:

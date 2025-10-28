@@ -157,11 +157,17 @@ class MetricsCacheManager:
             logger.error(f"❌ Error leyendo métricas desde caché: {e}")
             return None
     
-    def calculate_and_update_metrics(self, linea: str, fecha: str, plan_rows: list = None):
+    def calculate_and_update_metrics(self, linea: str, fecha: str, plan_rows: list = None, num_personas: int = None):
         """
         Calcula métricas DIRECTAMENTE desde SQLite (plan_local)
         ✅ Ultra-rápido: Lee producción real directamente de la BD
         ✅ Sin cálculos complejos: Suma simple de plan_count y produced_count
+        
+        Args:
+            linea: Línea de producción
+            fecha: Fecha en formato ISO
+            plan_rows: Filas del plan (opcional)
+            num_personas: Número de personas (opcional, si no se provee usa valor por defecto)
         """
         try:
             # ✅ Leer datos directamente de SQLite
@@ -193,12 +199,14 @@ class MetricsCacheManager:
             else:
                 eficiencia = 0.0
             
-            # Calcular UPH (última hora)
+            # Calcular UPH (última hora) - AHORA CUENTA PARES COMPLETOS
             uph = self._calculate_uph_from_db(linea, fecha)
             
-            # Obtener número de personas (desde configuración)
-            from ..config import settings
-            num_personas = getattr(settings, 'NUM_PERSONAS_LINEA', 7)
+            # Obtener número de personas
+            if num_personas is None:
+                # Intentar obtener desde configuración como fallback
+                from ..config import settings
+                num_personas = getattr(settings, 'NUM_PERSONAS_LINEA', 6)
             
             # Calcular UPPH
             upph = (uph / num_personas) if num_personas > 0 else 0.0
@@ -219,30 +227,31 @@ class MetricsCacheManager:
             # Actualizar caché
             self.update_metrics_instant(linea, fecha, metrics)
             
-            logger.debug(f"✅ [CACHE] Métricas actualizadas: {linea} - Plan={plan_total_linea}, Prod={produccion_acumulada}, Efic={eficiencia:.1f}%")
+            logger.debug(f"✅ [CACHE] Métricas actualizadas: {linea} - Plan={plan_total_linea}, Prod={produccion_acumulada}, Efic={eficiencia:.1f}%, UPH={uph}, UPPH={upph:.2f}")
             
         except Exception as e:
             logger.error(f"❌ Error calculando métricas desde SQLite: {e}", exc_info=True)
     
     def _calculate_uph_from_db(self, linea: str, fecha: str) -> float:
-        """Calcula UPH de la última hora desde SQLite"""
+        """Calcula UPH de la última hora desde SQLite (contando pares completos)"""
         try:
             with sqlite3.connect(self.sqlite_path, timeout=5) as conn:
                 cursor = conn.cursor()
                 
-                # Obtener escaneos de la última hora
+                # Obtener escaneos completos de la última hora (dividir entre 2 porque son pares)
                 cursor.execute("""
-                    SELECT COUNT(*) as count
+                    SELECT COUNT(*)/2 as count
                     FROM scans_local
                     WHERE linea = ?
                     AND fecha = ?
                     AND datetime(ts) >= datetime('now', '-1 hour')
+                    AND is_complete = 1
                 """, (linea, fecha))
                 
                 result = cursor.fetchone()
-                count_last_hour = result[0] if result else 0
+                count_last_hour = int(result[0]) if result and result[0] else 0
                 
-                # UPH = conteo de última hora (ya está normalizado a 1 hora)
+                # UPH = pares completos en la última hora
                 return float(count_last_hour)
                 
         except Exception as e:

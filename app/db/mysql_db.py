@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime, date
 import time
 import threading
+from queue import Queue, Empty
 
 from ..config import settings
 from ..models.entities import ScanRecord, ModeloRef, ResumenProduccion
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class MySQLDatabase:
-    """Adaptador para MySQL usando PyMySQL con optimizaciones de rendimiento"""
+    """Adaptador para MySQL usando PyMySQL con CONNECTION POOLING"""
 
     def __init__(self):
         self.host = settings.MYSQL_HOST
@@ -27,7 +28,47 @@ class MySQLDatabase:
         self._last_queue_check = 0
         self._cached_queue_size = 0
         self._schema_initialized = False
+        
+        # 🔥 CONNECTION POOL: Crear pool de conexiones reutilizables
+        self._pool_size = 5  # Tamaño del pool
+        self._connection_pool = Queue(maxsize=self._pool_size)
+        self._pool_lock = threading.Lock()
+        self._initialize_pool()
+        
         self._test_connection()
+
+    def _initialize_pool(self):
+        """Inicializa el pool de conexiones"""
+        logger.info(f"🔄 Inicializando connection pool de MySQL (size: {self._pool_size})...")
+        for _ in range(self._pool_size):
+            try:
+                conn = self._create_connection()
+                self._connection_pool.put(conn)
+            except Exception as e:
+                logger.error(f"Error creando conexión para pool: {e}")
+        logger.info(f"✅ Connection pool inicializado con {self._connection_pool.qsize()} conexiones")
+    
+    def _create_connection(self):
+        """Crea una nueva conexión MySQL"""
+        connection = pymysql.connect(
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            password=self.password,
+            database=self.database,
+            charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor,
+            autocommit=True,
+            connect_timeout=5,
+            read_timeout=10,
+            write_timeout=10,
+        )
+        
+        # Configurar zona horaria de México al crear conexión
+        with connection.cursor() as cursor:
+            cursor.execute("SET time_zone = '-06:00'")
+        
+        return connection
 
     def _test_connection(self):
         """Verifica que la conexión a MySQL funcione"""
@@ -42,42 +83,56 @@ class MySQLDatabase:
 
     @contextmanager
     def get_connection(self):
-        """Context manager para conexiones MySQL optimizado con timeouts robustos"""
+        """Context manager que obtiene conexiones del POOL (reutiliza conexiones)"""
         connection = None
-        with self._connection_lock:
+        timeout = 5  # Segundos para esperar por una conexión del pool
+        
+        try:
+            # 🔥 Intentar obtener conexión del pool con timeout
             try:
-                connection = pymysql.connect(
-                    host=self.host,
-                    port=self.port,
-                    user=self.user,
-                    password=self.password,
-                    database=self.database,
-                    charset='utf8mb4',
-                    cursorclass=pymysql.cursors.DictCursor,
-                    autocommit=True,  # Habilitar autocommit para operaciones simples
-                    connect_timeout=5,   # ✅ Timeout de conexión reducido para detectar problemas rápido
-                    read_timeout=10,     # ✅ Timeout de lectura para evitar bloqueos
-                    write_timeout=10,    # ✅ Timeout de escritura para evitar bloqueos
-                )
-                
-                # Configurar zona horaria de México (Nuevo León) al conectarse
-                with connection.cursor() as cursor:
-                    cursor.execute("SET time_zone = '-06:00'")  # UTC-6 (Nuevo León, México)
-                
-                yield connection
-            except Error as e:
-                if connection:
-                    try:
-                        connection.rollback()
-                    except:
-                        pass
-                logger.error(f"Error MySQL: {e}")
-                raise
-            finally:
-                if connection:
+                connection = self._connection_pool.get(timeout=timeout)
+            except Empty:
+                logger.warning("⚠️ Pool agotado, creando conexión temporal...")
+                connection = self._create_connection()
+            
+            # Verificar si la conexión está viva (ping)
+            try:
+                connection.ping(reconnect=True)
+            except:
+                logger.warning("🔄 Conexión muerta, recreando...")
+                try:
+                    connection.close()
+                except:
+                    pass
+                connection = self._create_connection()
+            
+            yield connection
+            
+        except Error as e:
+            if connection:
+                try:
+                    connection.rollback()
+                except:
+                    pass
+            logger.error(f"Error MySQL: {e}")
+            raise
+        finally:
+            # 🔥 Devolver conexión al pool (en lugar de cerrarla)
+            if connection:
+                try:
+                    # Verificar que sigue conectada antes de devolverla
+                    connection.ping(reconnect=False)
+                    # Si el pool está lleno, cerrar esta conexión
+                    if self._connection_pool.full():
+                        connection.close()
+                    else:
+                        self._connection_pool.put_nowait(connection)
+                except:
+                    # Si falló el ping o hay error, cerrar conexión
                     try:
                         connection.close()
                     except:
+                        pass
                         pass
 
     def init_schema(self):

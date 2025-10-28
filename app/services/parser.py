@@ -12,18 +12,21 @@ from ..models import ParsedScan, ParsedBarcode
 # Ejemplos válidos:
 #  - I20251001'0004'00005ñMAINñEBR33105305ñ1ñ   (NUEVO - español con ñ)
 #  - I20250226-0013-00002;MAIN;EBR41039117;1;    (ANTIGUO - punto y coma)
+#  - II20251024-0025-0596;MAIN;EBR30299363;1;    (ANTIGUO - tipo "II")
 #  - I20250922-0032-0441;MAIN;EBR41039119;1;     (secuencia de 4 dígitos)
 #  - I20250924-0030-0511;DISPLAY TB;EBR85856023;1; (estación con espacio)
 
 # Pattern para formato NUEVO con ñ (acepta minúscula y mayúscula)
+# Tipo: Uno o más caracteres (soporta I, II, III, etc.)
 QR_PATTERN_NEW = re.compile(
-    r"^(?P<tipo>[A-Z])(?P<fecha>\d{8})'(?P<lote_num>\d{4})'(?P<secuencia>\d{4,5})[ñÑ]"
+    r"^(?P<tipo>[A-Z]+)(?P<fecha>\d{8})'(?P<lote_num>\d{4})'(?P<secuencia>\d{4,5})[ñÑ]"
     r"(?P<estacion>[A-ZÑ0-9_ ]+)[ñÑ](?P<nparte>[A-Z0-9]+)[ñÑ](?P<cantidad>\d+)[ñÑ]$"
 )
 
 # Pattern para formato ANTIGUO con ;
+# Tipo: Uno o más caracteres (soporta I, II, III, etc.)
 QR_PATTERN_OLD = re.compile(
-    r"^(?P<tipo>[A-Z])(?P<fecha>\d{8})-(?P<lote_num>\d{4})-(?P<secuencia>\d{4,5});"
+    r"^(?P<tipo>[A-Z]+)(?P<fecha>\d{8})-(?P<lote_num>\d{4})-(?P<secuencia>\d{4,5});"
     r"(?P<estacion>[A-Z0-9_ ]+);(?P<nparte>[A-Z0-9]+);(?P<cantidad>\d+);$"
 )
 

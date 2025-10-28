@@ -650,12 +650,56 @@ class DualDatabaseSystem:
                         barcode_scan = scan
             
             if qr_scan and barcode_scan:
-                # ¡Tenemos par completo! Pero primero validar SUB ASSY si está habilitado
+                # ¡Tenemos par completo! Pero primero validar que sean del mismo modelo
+                
+                # ✅ VALIDACIÓN: Verificar que QR y BARCODE sean del mismo nparte
+                qr_nparte = qr_scan[7]  # nparte del QR
+                barcode_nparte = barcode_scan[7]  # nparte del BARCODE
+                
+                # En modo normal (no SUB ASSY), QR y BARCODE deben ser del mismo nparte
+                from ..config import settings
+                is_sub_assy_mode = (getattr(settings, 'SUB_ASSY_MODE', False) and 
+                                   getattr(settings, 'APP_MODE', 'ASSY').upper() == 'ASSY')
+                
+                if not is_sub_assy_mode:
+                    # Modo normal: ambos deben ser del mismo nparte
+                    if qr_nparte != barcode_nparte:
+                        logger.warning(
+                            f"🚫 MODELO DIFERENTE EN PAR: QR es '{qr_nparte}' pero BARCODE es '{barcode_nparte}'. "
+                            f"Eliminando ambos del buffer."
+                        )
+                        # Eliminar ambos escaneos del staging (rechazar par)
+                        conn.execute("DELETE FROM pending_scans WHERE id IN (?, ?)", 
+                                   (qr_scan[0], barcode_scan[0]))
+                        return (-10, nparte)  # MODELO DIFERENTE en el par
+                
+                # ✅ VALIDACIÓN: Verificar que el nparte coincida con el plan EN PROGRESO
+                try:
+                    cur_plan_check = conn.execute("""
+                        SELECT id, part_no FROM plan_local
+                        WHERE line = ? AND status = 'EN PROGRESO'
+                        ORDER BY sequence LIMIT 1
+                    """, (linea,))
+                    plan_en_progreso = cur_plan_check.fetchone()
+                    
+                    if plan_en_progreso:
+                        plan_nparte = plan_en_progreso[1]
+                        nparte_a_validar = qr_nparte if not is_sub_assy_mode else barcode_nparte
+                        
+                        if plan_nparte != nparte_a_validar:
+                            logger.warning(
+                                f"🚫 MODELO DIFERENTE AL PLAN: Plan EN PROGRESO es '{plan_nparte}' "
+                                f"pero par escaneado es '{nparte_a_validar}'. Eliminando par del buffer."
+                            )
+                            # Eliminar ambos escaneos del staging
+                            conn.execute("DELETE FROM pending_scans WHERE id IN (?, ?)", 
+                                       (qr_scan[0], barcode_scan[0]))
+                            return (-10, nparte)  # MODELO DIFERENTE al plan EN PROGRESO
+                except Exception as e_plan:
+                    logger.error(f"Error verificando plan EN PROGRESO: {e_plan}")
                 
                 # 🔍 VALIDACIÓN SUB ASSY: Solo en modo ASSY y si está habilitado
-                from ..config import settings
-                if (getattr(settings, 'SUB_ASSY_MODE', False) and 
-                    getattr(settings, 'APP_MODE', 'ASSY').upper() == 'ASSY'):
+                if is_sub_assy_mode:
                     
                     # En modo SUB ASSY: 
                     # - barcode_scan = BARCODE del Part No principal
@@ -1380,11 +1424,19 @@ class DualDatabaseSystem:
             elif pair_result == -7:
                 # SUB ASSY validation failed - par rechazado
                 return -7
-            else:
-                # Par incompleto (pair_result == 0)
+            elif pair_result == -10:
+                # MODELO DIFERENTE - par rechazado
+                logger.warning(f"🚫 MODELO DIFERENTE: Par rechazado (QR y BARCODE no coinciden con plan EN PROGRESO)")
+                return -10
+            elif pair_result == 0:
+                # Par incompleto
                 opposite = "BARCODE" if scan_format == "QR" else "QR"
                 logger.info(f"⏳ {scan_format} en STAGING, esperando {opposite} para insertar en DB ({scan_record.nparte})")
                 return -5  # Código -5: Esperando par (para que UI lo detecte)
+            else:
+                # Otro código de error
+                logger.warning(f"⚠️ Error inesperado al completar par: código {pair_result}")
+                return pair_result
             
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint failed" in str(e):
@@ -2514,9 +2566,20 @@ class DualDatabaseSystem:
                     
                     #  DETECTAR CAMBIOS Y NOTIFICAR A LA UI (ANTES del commit y dentro del with)
                     # Contar planes actuales para detectar cambios (nuevos, eliminados o modificados)
-                    cursor = conn.execute("SELECT COUNT(*) as total, SUM(plan_count) as sum_plan FROM plan_local WHERE working_date = ?", (today.isoformat(),))
+                    # INCLUIR: planned_start, planned_end, effective_minutes, sequence para detectar TODOS los cambios
+                    cursor = conn.execute("""
+                        SELECT 
+                            COUNT(*) as total, 
+                            SUM(plan_count) as sum_plan,
+                            SUM(CAST(COALESCE(effective_minutes, 0) AS INTEGER)) as sum_minutes,
+                            GROUP_CONCAT(COALESCE(planned_start, 'NULL') || '|' || COALESCE(planned_end, 'NULL') || '|' || COALESCE(sequence, 0), ';') as schedule_hash
+                        FROM plan_local 
+                        WHERE working_date = ?
+                    """, (today.isoformat(),))
                     current_state = cursor.fetchone()
-                    current_hash = f"{current_state[0]}_{current_state[1]}"  # total_planes_suma_plan_count
+                    
+                    # Hash más completo que detecta cambios en horarios y secuencia
+                    current_hash = f"{current_state[0]}_{current_state[1]}_{current_state[2]}_{hash(current_state[3]) if current_state[3] else 0}"
                     
                     # Si cambió desde la última sincronización, marcar para recargar UI
                     if not hasattr(self, '_last_plan_hash') or self._last_plan_hash != current_hash:
@@ -3567,9 +3630,22 @@ class DualDatabaseSystem:
                 """).fetchall()
                 
                 if not pendientes:
+                    logger.debug("📦 No hay scans pendientes para aplicar")
                     return  # No hay nada pendiente
                 
-                logger.info(f"📦 APLICANDO SCANS PENDIENTES: Analizando {len(pendientes)} grupos de scans...")
+                logger.warning(f"📦 APLICANDO SCANS PENDIENTES: Analizando {len(pendientes)} grupos de scans...")
+                
+                # DEBUG: Mostrar todos los planes disponibles
+                planes_disponibles = conn.execute("""
+                    SELECT id, line, part_no, lot_no, status, produced_count
+                    FROM plan_local
+                    WHERE status IN ('PAUSADO', 'EN PROGRESO')
+                    ORDER BY line, status, sequence
+                """).fetchall()
+                
+                logger.debug(f"📋 Planes disponibles para aplicar scans: {len(planes_disponibles)}")
+                for pl in planes_disponibles[:10]:  # Mostrar solo primeros 10
+                    logger.debug(f"   • Plan {pl[0]}: {pl[1]} | {pl[2]} | Lote:{pl[3]} | {pl[4]} | Producido:{pl[5]}")
                 
                 # Agrupar por (linea, nparte, lote) para contar pares
                 from collections import defaultdict
@@ -3620,20 +3696,40 @@ class DualDatabaseSystem:
                     
                     try:
                         # Buscar si ahora existe un plan para este nparte
+                        # PRIORIDAD:
+                        # 1. Plan EN PROGRESO con lote exacto
+                        # 2. Plan EN PROGRESO sin importar lote
+                        # 3. Plan PAUSADO con lote exacto
+                        # 4. Plan PAUSADO sin importar lote
                         plan_row = conn.execute("""
-                            SELECT id, produced_count
+                            SELECT id, produced_count, lot_no, status
                             FROM plan_local
                             WHERE line = ? AND part_no = ?
-                            AND (? IS NULL OR lot_no = ?)
                             AND status IN ('PAUSADO', 'EN PROGRESO')
                             ORDER BY 
                                 CASE WHEN status = 'EN PROGRESO' THEN 0 ELSE 1 END,
+                                CASE WHEN lot_no = ? THEN 0 ELSE 1 END,
                                 sequence ASC
                             LIMIT 1
-                        """, (linea, nparte, lote, lote)).fetchone()
+                        """, (linea, nparte, lote)).fetchone()
                         
                         if plan_row:
-                            plan_id, produced_count = plan_row
+                            plan_id, produced_count, plan_lot, plan_status = plan_row
+                            logger.debug(f"✅ Encontrado plan {plan_id} para {nparte} (Lote scan:{lote}, Lote plan:{plan_lot}, Estado:{plan_status})")
+                        else:
+                            logger.debug(f"❌ NO encontrado plan para {linea} | {nparte} | Lote:{lote}")
+                            # DEBUG: Buscar si hay plan con otro estado
+                            any_plan = conn.execute("""
+                                SELECT id, status, lot_no
+                                FROM plan_local
+                                WHERE line = ? AND part_no = ?
+                                LIMIT 1
+                            """, (linea, nparte)).fetchone()
+                            if any_plan:
+                                logger.debug(f"   ⚠️ Existe plan {any_plan[0]} pero estado es '{any_plan[1]}' (lote: {any_plan[2]})")
+                        
+                        if plan_row:
+                            plan_id, produced_count, plan_lot, plan_status = plan_row
                             
                             # Incrementar produced_count por PARES COMPLETOS solamente
                             nuevo_produced = produced_count + pares_completos
@@ -3659,6 +3755,9 @@ class DualDatabaseSystem:
                             
                             # También agregar al buffer para sync a MySQL
                             self._plan_produced_buffer[plan_id] = self._plan_produced_buffer.get(plan_id, 0) + pares_completos
+                            
+                            # 🔔 NOTIFICAR AL UI: Marcar que el plan cambió para forzar actualización inmediata
+                            self._plan_changed = True
                         else:
                             logger.debug(f"⏳ Sin plan activo para {nparte} (lote: {lote})")
                     
@@ -3674,6 +3773,8 @@ class DualDatabaseSystem:
                 
                 if aplicados_total > 0:
                     logger.warning(f"🎉 SCANS RECUPERADOS: {aplicados_total} piezas aplicadas a planes activos")
+                    # 🔔 NOTIFICAR AL UI: Marcar que el plan cambió para forzar actualización inmediata
+                    self._plan_changed = True
                 else:
                     logger.debug(f"⏳ Scans aún esperando plan compatible")
                 
