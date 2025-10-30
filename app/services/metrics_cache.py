@@ -233,26 +233,59 @@ class MetricsCacheManager:
             logger.error(f"❌ Error calculando métricas desde SQLite: {e}", exc_info=True)
     
     def _calculate_uph_from_db(self, linea: str, fecha: str) -> float:
-        """Calcula UPH de la última hora desde SQLite (contando pares completos)"""
+        """
+        Calcula UPH como velocidad proyectada (piezas por hora basado en tiempo transcurrido)
+        UPH = (total_piezas_completas / segundos_transcurridos) * 3600
+        Nunca retorna 0 si hay al menos 1 scan completo
+        """
         try:
             with sqlite3.connect(self.sqlite_path, timeout=5) as conn:
                 cursor = conn.cursor()
                 
-                # Obtener escaneos completos de la última hora (dividir entre 2 porque son pares)
+                # Obtener el primer y último scan del turno actual, más el total de piezas
                 cursor.execute("""
-                    SELECT COUNT(*)/2 as count
+                    SELECT 
+                        COUNT(*)/2 as total_piezas,
+                        MIN(ts) as primer_scan,
+                        MAX(ts) as ultimo_scan
                     FROM scans_local
                     WHERE linea = ?
                     AND fecha = ?
-                    AND datetime(ts) >= datetime('now', '-1 hour')
                     AND is_complete = 1
                 """, (linea, fecha))
                 
                 result = cursor.fetchone()
-                count_last_hour = int(result[0]) if result and result[0] else 0
                 
-                # UPH = pares completos en la última hora
-                return float(count_last_hour)
+                if not result or not result[0] or result[0] == 0:
+                    return 0.0
+                
+                total_piezas = float(result[0])
+                primer_scan = result[1]
+                ultimo_scan = result[2]
+                
+                if not primer_scan or not ultimo_scan:
+                    return 0.0
+                
+                # Calcular segundos transcurridos desde el primer scan
+                cursor.execute("""
+                    SELECT (julianday(?) - julianday(?)) * 86400 as segundos
+                """, (ultimo_scan, primer_scan))
+                
+                segundos_result = cursor.fetchone()
+                segundos_transcurridos = float(segundos_result[0]) if segundos_result else 0.0
+                
+                # Usar mínimo de 60 segundos (1 minuto) para evitar proyecciones irreales
+                # Ejemplo: 1 pieza en 5 segundos NO debe proyectar 720 UPH
+                SEGUNDOS_MINIMOS = 60.0
+                if segundos_transcurridos < SEGUNDOS_MINIMOS:
+                    segundos_transcurridos = SEGUNDOS_MINIMOS
+                
+                # UPH = (piezas / segundos) * 3600 segundos/hora
+                uph_proyectado = (total_piezas / segundos_transcurridos) * 3600.0
+                
+                logger.debug(f"📊 UPH calculado: {total_piezas} piezas en {segundos_transcurridos:.1f}s = {uph_proyectado:.1f} UPH")
+                
+                return uph_proyectado
                 
         except Exception as e:
             logger.error(f"❌ Error calculando UPH: {e}")

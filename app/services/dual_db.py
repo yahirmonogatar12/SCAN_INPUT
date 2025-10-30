@@ -83,6 +83,11 @@ class DualDatabaseSystem:
         
         # 🧹 AUTO-REPARACIÓN AL INICIO: Limpiar pending_scans al arrancar
         self._cleanup_on_startup()
+        repaired_pairs, orphan_scans = self._repair_unlinked_pairs()
+        if repaired_pairs > 0:
+            logger.warning(f"🔧 Inicio: Reparados {repaired_pairs} pares huérfanos previos.")
+        if orphan_scans > 0:
+            logger.warning(f"⚠️ Inicio: Permanecen {orphan_scans} escaneos sin pareja (se reintentará en sync).")
         
         # 🚀 Inicializar sistema de caché de métricas
         self.metrics_cache = init_metrics_cache(self.sqlite_path)
@@ -376,9 +381,97 @@ class DualDatabaseSystem:
         except Exception as e:
             logger.error(f"Error en cleanup_on_startup: {e}", exc_info=True)
 
+    def _repair_unlinked_pairs(self) -> tuple[int, int]:
+        """
+        🔧 Repara escaneos completos que quedaron sin vincular (linked_scan_id NULL).
+
+        Returns:
+            tuple[int, int]: (pares reparados, escaneos que aún quedaron sueltos)
+        """
+        repaired_pairs = 0
+        leftovers = 0
+        try:
+            with self._get_sqlite_connection(timeout=5.0) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """
+                    SELECT id, scan_format, linea, nparte, lote, ts
+                    FROM scans_local
+                    WHERE linked_scan_id IS NULL
+                      AND scan_format IN ('QR', 'BARCODE')
+                      AND synced_to_mysql = 0
+                """
+                ).fetchall()
+
+                if not rows:
+                    return (0, 0)
+
+                from collections import defaultdict
+
+                grouped: dict[tuple[str, str, str], dict[str, list[tuple[str, int]]]] = defaultdict(
+                    lambda: {"QR": [], "BARCODE": []}
+                )
+                for row in rows:
+                    key = (
+                        (row["linea"] or "").strip(),
+                        (row["nparte"] or "").strip(),
+                        (row["lote"] or "").strip(),
+                    )
+                    ts_val = row["ts"] or ""
+                    grouped[key][row["scan_format"].upper()].append((ts_val, row["id"]))
+
+                for (linea, nparte, lote), bucket in grouped.items():
+                    qr_list = sorted(bucket["QR"])
+                    bc_list = sorted(bucket["BARCODE"])
+                    pairable = min(len(qr_list), len(bc_list))
+
+                    for idx in range(pairable):
+                        qr_ts, qr_id = qr_list[idx]
+                        bc_ts, bc_id = bc_list[idx]
+                        if qr_id == bc_id:
+                            leftovers += 1
+                            continue
+
+                        conn.execute(
+                            """
+                            UPDATE scans_local
+                            SET linked_scan_id = ?, is_complete = 1, synced_to_mysql = 0
+                            WHERE id = ?
+                        """,
+                            (bc_id, qr_id),
+                        )
+                        conn.execute(
+                            """
+                            UPDATE scans_local
+                            SET linked_scan_id = ?, is_complete = 1, synced_to_mysql = 0
+                            WHERE id = ?
+                        """,
+                            (qr_id, bc_id),
+                        )
+                        conn.execute(
+                            """
+                            UPDATE scans_sin_plan
+                            SET aplicado = 1
+                            WHERE scan_id IN (?, ?)
+                        """,
+                            (qr_id, bc_id),
+                        )
+                        repaired_pairs += 1
+
+                    leftovers += abs(len(qr_list) - len(bc_list))
+                    if pairable:
+                        logger.debug(
+                            f"🔗 Reparados {pairable} pares en línea={linea or '??'} nparte={nparte or '??'} lote={lote or 'N/A'}"
+                        )
+
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error reparando pares huérfanos: {e}", exc_info=True)
+        return (repaired_pairs, leftovers)
+
     def cleanup_orphaned_scans_manual(self, linea: Optional[str] = None, force_all: bool = False) -> int:
         """🚨 FUNCIÓN DE EMERGENCIA: Limpieza MANUAL de pending_scans
-        
+
         Esta función puede ser llamada desde la UI o herramientas de diagnóstico.
         
         Args:
@@ -3188,6 +3281,70 @@ class DualDatabaseSystem:
         }
         
         try:
+            self._aplicar_scans_pendientes()
+        except Exception as pend_err:
+            logger.error(f"Error aplicando scans pendientes antes de cerrar: {pend_err}")
+
+        try:
+            repaired_pairs, leftovers = self._repair_unlinked_pairs()
+            if repaired_pairs > 0:
+                logger.info(f"🔧 Reparados {repaired_pairs} pares huérfanos antes de sincronizar.")
+            if leftovers > 0:
+                logger.warning(f"⚠️ Permanecen {leftovers} escaneos sin pareja al cerrar.")
+        except Exception as repair_err:
+            logger.error(f"Error reparando pares huérfanos antes de cerrar: {repair_err}")
+
+        try:
+            for cycle in range(5):
+                synced_pairs = self._sync_scans_to_mysql()
+                if synced_pairs <= 0:
+                    break
+                result['scans_synced'] += synced_pairs
+                logger.info(f"🔁 Flush previo al cierre (ciclo {cycle + 1}): {synced_pairs} pares enviados.")
+        except Exception as flush_err:
+            logger.error(f"Error forzando sync de scans antes de cerrar: {flush_err}")
+        
+        # Aplicar y reparar antes de sincronizar
+        try:
+            self._aplicar_scans_pendientes()
+        except Exception as pend_err:
+            logger.error(f"Error aplicando scans pendientes antes de cerrar: {pend_err}")
+
+        try:
+            repaired_pairs, leftovers = self._repair_unlinked_pairs()
+            if repaired_pairs > 0:
+                logger.info(f"🔧 Reparados {repaired_pairs} pares huérfanos antes de sincronizar.")
+            if leftovers > 0:
+                logger.warning(f"⚠️ Permanecen {leftovers} escaneos sin pareja al cerrar.")
+        except Exception as repair_err:
+            logger.error(f"Error reparando pares huérfanos antes de cerrar: {repair_err}")
+
+        try:
+            for cycle in range(5):
+                synced_pairs = self._sync_scans_to_mysql()
+                if synced_pairs <= 0:
+                    break
+                result['scans_synced'] += synced_pairs
+                logger.info(f"🔁 Flush previo al cierre (ciclo {cycle + 1}): {synced_pairs} pares enviados.")
+        except Exception as flush_err:
+            logger.error(f"Error forzando sync de scans antes de cerrar: {flush_err}")
+
+        # Aplicar y reparar antes de sincronizar
+        try:
+            self._aplicar_scans_pendientes()
+        except Exception as pend_err:
+            logger.error(f"Error aplicando scans pendientes antes de cerrar: {pend_err}")
+
+        try:
+            repaired_pairs, leftovers = self._repair_unlinked_pairs()
+            if repaired_pairs > 0:
+                logger.info(f"🔧 Reparados {repaired_pairs} pares huérfanos antes de sincronizar.")
+            if leftovers > 0:
+                logger.warning(f"⚠️ Permanecen {leftovers} escaneos sin pareja al cerrar.")
+        except Exception as repair_err:
+            logger.error(f"Error reparando pares huérfanos antes de cerrar: {repair_err}")
+        
+        try:
             # 1. Sincronizar incrementos pendientes en direct_mysql
             try:
                 if hasattr(self, '_direct_mysql') and self._direct_mysql:
@@ -3731,7 +3888,84 @@ class DualDatabaseSystem:
                         if plan_row:
                             plan_id, produced_count, plan_lot, plan_status = plan_row
                             
-                            # Incrementar produced_count por PARES COMPLETOS solamente
+                            qr_candidates = []
+                            barcode_candidates = []
+                            missing_scans = 0
+                            
+                            for fallback_id in info['ids']:
+                                scan_info = conn.execute("""
+                                    SELECT scan_id FROM scans_sin_plan WHERE id = ?
+                                """, (int(fallback_id),)).fetchone()
+                                
+                                if not scan_info:
+                                    logger.warning(f"⚠️  scans_sin_plan sin referencia (id={fallback_id})")
+                                    continue
+                                
+                                scan_id = scan_info[0]
+                                if scan_id is None:
+                                    logger.warning(f"⚠️  scans_sin_plan {fallback_id} no tiene scan_id asociado")
+                                    continue
+                                
+                                scan_row = conn.execute("""
+                                    SELECT id, ts, scan_format, linked_scan_id
+                                    FROM scans_local
+                                    WHERE id = ?
+                                """, (scan_id,)).fetchone()
+                                
+                                if not scan_row:
+                                    missing_scans += 1
+                                    logger.warning(f"⚠️  No se encontró scan_local id={scan_id} (fallback {fallback_id})")
+                                    continue
+                                
+                                ts_val = scan_row[1] or ""
+                                scan_format_local = (scan_row[2] or "").upper()
+                                
+                                conn.execute("""
+                                    UPDATE scans_local 
+                                    SET is_complete = 1,
+                                        synced_to_mysql = 0
+                                    WHERE id = ?
+                                """, (scan_id,))
+                                logger.debug(f"✅ Scan {scan_id} marcado como completo y pendiente de sync")
+                                
+                                if scan_format_local == "QR":
+                                    qr_candidates.append((ts_val, scan_id))
+                                elif scan_format_local == "BARCODE":
+                                    barcode_candidates.append((ts_val, scan_id))
+                                else:
+                                    logger.debug(f"ℹ️  Scan {scan_id} con formato '{scan_format_local}' fuera de emparejamiento automático")
+                            
+                            qr_candidates.sort(key=lambda item: (item[0], item[1]))
+                            barcode_candidates.sort(key=lambda item: (item[0], item[1]))
+                            
+                            linked_pairs = 0
+                            for qr_item, bc_item in zip(qr_candidates, barcode_candidates):
+                                qr_id = qr_item[1]
+                                bc_id = bc_item[1]
+                                
+                                conn.execute("""
+                                    UPDATE scans_local 
+                                    SET linked_scan_id = ?, is_complete = 1, synced_to_mysql = 0
+                                    WHERE id = ?
+                                """, (bc_id, qr_id))
+                                conn.execute("""
+                                    UPDATE scans_local 
+                                    SET linked_scan_id = ?, is_complete = 1, synced_to_mysql = 0
+                                    WHERE id = ?
+                                """, (qr_id, bc_id))
+                                linked_pairs += 1
+                                logger.debug(f"🔗 Emparejado QR {qr_id} ↔ BARCODE {bc_id}")
+                            
+                            leftover_qr = len(qr_candidates) - linked_pairs
+                            leftover_bc = len(barcode_candidates) - linked_pairs
+                            if leftover_qr or leftover_bc:
+                                logger.warning(f"⚠️  Scans sin pareja tras aplicar plan {plan_id} (QR:{leftover_qr}, BARCODE:{leftover_bc})")
+                            
+                            real_pares_completos = pair_count + linked_pairs + generic_count
+                            if real_pares_completos != pares_completos:
+                                logger.debug(f"ℹ️  Ajuste de pares completos ({pares_completos} → {real_pares_completos}) antes de actualizar plan")
+                            pares_completos = real_pares_completos
+                            
                             nuevo_produced = produced_count + pares_completos
                             conn.execute("""
                                 UPDATE plan_local
@@ -3740,7 +3974,6 @@ class DualDatabaseSystem:
                                 WHERE id = ?
                             """, (nuevo_produced, datetime.now(ZoneInfo(settings.TZ)).isoformat(), plan_id))
                             
-                            # Marcar TODOS los scans de este grupo como aplicados
                             for fallback_id in info['ids']:
                                 conn.execute("""
                                     UPDATE scans_sin_plan
@@ -3753,8 +3986,9 @@ class DualDatabaseSystem:
                             aplicados_total += pares_completos
                             logger.info(f"✅ Scans pendientes aplicados: Plan {plan_id} ({nparte}) +{pares_completos} piezas (QR:{qr_count}, BC:{bc_count}, PAIR:{pair_count}) → {nuevo_produced}")
                             
-                            # También agregar al buffer para sync a MySQL
                             self._plan_produced_buffer[plan_id] = self._plan_produced_buffer.get(plan_id, 0) + pares_completos
+                            if missing_scans:
+                                logger.warning(f"⚠️  {missing_scans} registros de scans_sin_plan no encontraron scan_local asociado")
                             
                             # 🔔 NOTIFICAR AL UI: Marcar que el plan cambió para forzar actualización inmediata
                             self._plan_changed = True

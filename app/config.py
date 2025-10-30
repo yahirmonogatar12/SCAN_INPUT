@@ -133,7 +133,7 @@ class Settings:
     # 🔍 DEBUG CRÍTICO: Log del valor cargado
     import logging
     _settings_logger = logging.getLogger(__name__)
-    _settings_logger.info(f"🎯 DEFAULT_LINE cargado desde .env: '{DEFAULT_LINE}' (raw: '{_default_line_raw}')")
+    _settings_logger.info(f"DEFAULT_LINE cargado desde .env: '{DEFAULT_LINE}' (raw: '{_default_line_raw}')")
 
     # Modo de operación: ASSY (actual) o IMD (nuevo)
     APP_MODE: str = os.getenv("APP_MODE", "ASSY").strip().upper()
@@ -168,7 +168,7 @@ class Settings:
                 if version_file.exists():
                     # Usar 'utf-8-sig' para eliminar automáticamente el BOM
                     version = version_file.read_text(encoding='utf-8-sig').strip()
-                    logger.info(f"✅ Versión leída de {version_file}: {version}")
+                    logger.info(f"Versión leída de {version_file}: {version}")
                     return version
                 else:
                     logger.debug(f"  ❌ No existe: {version_file}")
@@ -216,26 +216,26 @@ def update_env_var(key: str, value: str) -> None:
     Conserva líneas no relacionadas y comentarios. Si el archivo no existe,
     lo crea. No hace validación de tipos; guarda texto literal.
     """
-    # ✅ Usar INSTALL_DIR para persistencia (no ROOT_DIR que es temporal)
+    # Usar INSTALL_DIR para persistencia (no ROOT_DIR que es temporal)
     env_path = INSTALL_DIR / ".env"
     
-    # 🔍 DEBUG: Log para rastrear escrituras
+    # DEBUG: Log para rastrear escrituras
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"💾 Guardando {key}={value} en {env_path}")
-    
+    logger.info(f"Guardando {key}={value} en {env_path}")
+
     lines = []
     if env_path.exists():
         try:
             content = env_path.read_text(encoding="utf-8", errors="ignore").splitlines()
             lines = content
-            logger.info(f"📖 .env existe con {len(lines)} líneas")
+            logger.info(f".env existe con {len(lines)} líneas")
         except Exception as e:
             # Si por alguna razón no se puede leer, continuamos con lista vacía
-            logger.warning(f"⚠️ Error leyendo .env: {e}")
+            logger.warning(f"Error leyendo .env: {e}")
             lines = []
     else:
-        logger.info(f"📄 .env no existe, se creará en {env_path}")
+        logger.info(f".env no existe, se creará en {env_path}")
 
     key_eq = f"{key}="
     updated = False
@@ -248,16 +248,16 @@ def update_env_var(key: str, value: str) -> None:
         if k.strip() == key:
             new_lines.append(f"{key}={value}")
             updated = True
-            logger.info(f"✏️ Actualizada línea existente: {key}={value}")
+            logger.info(f"Actualizada línea existente: {key}={value}")
         else:
             new_lines.append(line)
 
     if not updated:
         new_lines.append(f"{key}={value}")
-        logger.info(f"➕ Agregada nueva línea: {key}={value}")
+        logger.info(f"Agregada nueva línea: {key}={value}")
 
     try:
         env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-        logger.info(f"✅ .env guardado exitosamente con {len(new_lines)} líneas")
+        logger.info(f".env guardado exitosamente con {len(new_lines)} líneas")
     except Exception as e:
-        logger.error(f"❌ Error guardando .env: {e}")
+        logger.error(f"Error guardando .env: {e}")
