@@ -4287,9 +4287,9 @@ class MainWindow(QtWidgets.QMainWindow):
             dual_db = get_dual_db()
             
             # Trigger manual de sincronizacií³n de plan
-            if hasattr(dual_db, '_sync_worker') and dual_db._sync_worker:
-                # Forzar sync inmediato
-                dual_db._sync_worker._sync_plan_from_mysql()
+            if dual_db and hasattr(dual_db, '_sync_plan_from_mysql'):
+                # Forzar sync inmediato (llamar directamente al método de dual_db)
+                dual_db._sync_plan_from_mysql()
                 logger.info("… Sync de plan forzado para nuevo dí­a")
             
             # Esperar un momento para que se complete la sincronizacií³n

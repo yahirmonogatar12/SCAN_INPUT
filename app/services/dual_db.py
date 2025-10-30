@@ -4066,6 +4066,30 @@ class DualDatabaseSystem:
             'production_synced': 0,
             'errors': []
         }
+
+        try:
+            self._aplicar_scans_pendientes()
+        except Exception as pend_err:
+            logger.error(f"Error aplicando scans pendientes antes de cerrar: {pend_err}")
+
+        try:
+            repaired_pairs, leftovers = self._repair_unlinked_pairs()
+            if repaired_pairs > 0:
+                logger.info(f"🔧 Reparados {repaired_pairs} pares huérfanos antes de sincronizar.")
+            if leftovers > 0:
+                logger.warning(f"⚠️ Permanecen {leftovers} escaneos sin pareja al cerrar.")
+        except Exception as repair_err:
+            logger.error(f"Error reparando pares huérfanos antes de cerrar: {repair_err}")
+
+        try:
+            for cycle in range(5):
+                synced_pairs = self._sync_scans_to_mysql()
+                if synced_pairs <= 0:
+                    break
+                result['scans_synced'] += synced_pairs
+                logger.info(f"🔁 Flush previo al cierre (ciclo {cycle + 1}): {synced_pairs} pares enviados.")
+        except Exception as flush_err:
+            logger.error(f"Error forzando sync de scans antes de cerrar: {flush_err}")
         
         try:
             # 1. Sincronizar incrementos pendientes en direct_mysql
