@@ -569,6 +569,8 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Cachí© para plan en progreso (evitar consultas constantes)
         self._plan_en_progreso_cache = {}  # {linea: (plan_id, part_no, timestamp)}
+        self._pending_cards_refresh = False
+        self._last_cards_refresh = 0.0
 
         # Meníº Admin siempre visible (sin control de usuarios)
 
@@ -808,8 +810,8 @@ class MainWindow(QtWidgets.QMainWindow):
         title_label = QtWidgets.QLabel(title)
         title_label.setStyleSheet(f"""
             color: lightgray;
-            font-size: 11px;
-            font-weight: 500;
+            font-size: 40px;
+            font-weight: 600;
             border: none;
             background: transparent;
         """)
@@ -820,7 +822,7 @@ class MainWindow(QtWidgets.QMainWindow):
         value_label = QtWidgets.QLabel(value)
         value_label.setStyleSheet(f"""
             color: {color};
-            font-size: 32px;
+            font-size: 55px;
             font-weight: bold;
             border: none;
             background: transparent;
@@ -994,7 +996,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.scan_history_empty_label = QtWidgets.QLabel("Esperando escaneos...")
         self.scan_history_empty_label.setStyleSheet("""
             color: #95a5a6;
-            font-size: 11px;
+            font-size: 14px;
             font-style: italic;
             background: transparent;
             padding: 8px;
@@ -1503,8 +1505,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Crear widget de scan en formato FILA (lista horizontal)
         scan_widget = QtWidgets.QFrame()
-        scan_widget.setMinimumHeight(40)
-        scan_widget.setMaximumHeight(40)
+        scan_widget.setMinimumHeight(55)
+        scan_widget.setMaximumHeight(55)
         
         # Color según resultado
         if success:
@@ -1521,7 +1523,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 background-color: {bg_color};
                 border-left: 4px solid {border_color};
                 border-radius: 2px;
-                padding: 4px 8px;
+                padding: 6px 10px;
             }}
             QFrame:hover {{
                 background-color: {bg_color}DD;
@@ -1531,7 +1533,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Layout HORIZONTAL para mostrar info en fila
         layout = QtWidgets.QHBoxLayout(scan_widget)
-        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(12)
 
         # 1. Status OK/NG
@@ -1540,7 +1542,7 @@ class MainWindow(QtWidgets.QMainWindow):
         status_label = QtWidgets.QLabel(status_text)
         status_label.setStyleSheet(f"""
             color: {status_color};
-            font-size: 13px;
+            font-size: 16px;
             font-weight: bold;
             background: transparent;
         """)
@@ -1552,7 +1554,7 @@ class MainWindow(QtWidgets.QMainWindow):
         type_label = QtWidgets.QLabel(scan_type)
         type_label.setStyleSheet(f"""
             color: {border_color};
-            font-size: 10px;
+            font-size: 13px;
             font-weight: bold;
             background: transparent;
         """)
@@ -1563,7 +1565,7 @@ class MainWindow(QtWidgets.QMainWindow):
         code_label = QtWidgets.QLabel(raw)
         code_label.setStyleSheet("""
             color: #ecf0f1;
-            font-size: 9px;
+            font-size: 12px;
             font-family: 'Consolas', 'Courier New', monospace;
             background: transparent;
         """)
@@ -1578,7 +1580,7 @@ class MainWindow(QtWidgets.QMainWindow):
         nparte_label = QtWidgets.QLabel(f"Parte: {nparte}")
         nparte_label.setStyleSheet("""
             color: #95a5a6;
-            font-size: 9px;
+            font-size: 12px;
             background: transparent;
         """)
         nparte_label.setFixedWidth(120)
@@ -1590,7 +1592,7 @@ class MainWindow(QtWidgets.QMainWindow):
             msg_label = QtWidgets.QLabel(message)
             msg_label.setStyleSheet(f"""
                 color: {'#f39c12' if success else '#e74c3c'};
-                font-size: 9px;
+                font-size: 12px;
                 font-style: italic;
                 background: transparent;
             """)
@@ -1607,7 +1609,7 @@ class MainWindow(QtWidgets.QMainWindow):
         time_label = QtWidgets.QLabel(timestamp)
         time_label.setStyleSheet("""
             color: #7f8c8d;
-            font-size: 9px;
+            font-size: 12px;
             background: transparent;
         """)
         time_label.setFixedWidth(60)
@@ -5434,6 +5436,38 @@ class MainWindow(QtWidgets.QMainWindow):
             self._sync_metrics_to_widget()
         except Exception:
             pass
+        try:
+            self._schedule_cards_refresh()
+        except Exception as schedule_err:
+            logger.debug(f"Error programando refresco de tarjetas: {schedule_err}")
+
+    def _schedule_cards_refresh(self, delay_ms: int = 200) -> None:
+        """Programa un refresco ligero de las tarjetas sin pausar el escaneo."""
+        if self._pending_cards_refresh:
+            return
+        self._pending_cards_refresh = True
+        QtCore.QTimer.singleShot(delay_ms, self._run_cards_refresh)
+
+    def _run_cards_refresh(self) -> None:
+        """Ejecuta el refresco de tarjetas respetando el ritmo de escaneo."""
+        if getattr(self, '_scan_in_progress', False):
+            QtCore.QTimer.singleShot(200, self._run_cards_refresh)
+            return
+        import time
+        now = time.monotonic()
+        min_interval = 1.5  # segundos
+        elapsed = now - getattr(self, '_last_cards_refresh', 0.0)
+        if elapsed < min_interval:
+            wait_ms = max(150, int((min_interval - elapsed) * 1000))
+            QtCore.QTimer.singleShot(wait_ms, self._run_cards_refresh)
+            return
+        try:
+            self._update_plan_totals([])
+        except Exception as refresh_err:
+            logger.debug(f"Error refrescando tarjetas: {refresh_err}")
+        finally:
+            self._last_cards_refresh = now
+            self._pending_cards_refresh = False
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Sincronizar datos pendientes y cerrar la ventana correctamente."""
