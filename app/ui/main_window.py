@@ -1546,7 +1546,7 @@ class MainWindow(QtWidgets.QMainWindow):
             font-weight: bold;
             background: transparent;
         """)
-        status_label.setFixedWidth(35)
+        status_label.setFixedWidth(60)
         status_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(status_label)
 
@@ -1558,7 +1558,7 @@ class MainWindow(QtWidgets.QMainWindow):
             font-weight: bold;
             background: transparent;
         """)
-        type_label.setFixedWidth(70)
+        type_label.setFixedWidth(85)
         layout.addWidget(type_label)
 
         # 3. Código completo (sin truncar, scrolleable)
@@ -1569,8 +1569,8 @@ class MainWindow(QtWidgets.QMainWindow):
             font-family: 'Consolas', 'Courier New', monospace;
             background: transparent;
         """)
-        code_label.setMinimumWidth(350)
-        code_label.setMaximumWidth(600)
+        code_label.setMinimumWidth(500)
+        code_label.setMaximumWidth(800)
         code_label.setWordWrap(False)
         code_label.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
         code_label.setToolTip(f"Código completo (seleccionable): {raw}")
@@ -1583,7 +1583,7 @@ class MainWindow(QtWidgets.QMainWindow):
             font-size: 12px;
             background: transparent;
         """)
-        nparte_label.setFixedWidth(120)
+        nparte_label.setFixedWidth(140)
         nparte_label.setToolTip(nparte)
         layout.addWidget(nparte_label)
 
@@ -1612,7 +1612,7 @@ class MainWindow(QtWidgets.QMainWindow):
             font-size: 12px;
             background: transparent;
         """)
-        time_label.setFixedWidth(60)
+        time_label.setFixedWidth(80)
         time_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(time_label)        # Agregar al historial (máximo 20, más reciente PRIMERO - arriba)
         self.scan_history.insert(0, scan_widget)  # Insertar al inicio
@@ -1904,19 +1904,21 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Si el plan no ha empezado (plan_acumulado = 0), no hay eficiencia aíºn
                 eficiencia = 0.0
             
+            uph, upph = self._resolve_uph_metrics(linea_seleccionada, today, produccion_total)
+
             # Actualizar cards con datos reales de SQLite (incluyendo tiempo)
             self._update_cards_with_metrics(
                 plan=plan_total,
                 plan_acum=plan_acumulado,
                 produccion=produccion_total,
                 eficiencia=eficiencia,
-                uph=0,
-                upph=0.0,
+                uph=uph,
+                upph=upph,
                 M_trans_total=M_trans_total,
                 M_tot_total=M_tot_total
             )
             
-            logger.debug(f"… _update_plan_totals desde SQLite: Plan={plan_total}, Prod={produccion_total}, Efic={eficiencia:.1f}%")
+            logger.debug(f"… _update_plan_totals desde SQLite: Plan={plan_total}, Prod={produccion_total}, Efic={eficiencia:.1f}%, UPH={uph:.1f}, UPPH={upph:.2f}")
             return
             
             # ===== Cí“DIGO VIEJO DEL CACHí‰ (DESHABILITADO) =====
@@ -5468,6 +5470,84 @@ class MainWindow(QtWidgets.QMainWindow):
         finally:
             self._last_cards_refresh = now
             self._pending_cards_refresh = False
+
+    def _resolve_uph_metrics(self, linea: str, fecha: str, produccion_total: int) -> tuple[float, float]:
+        """Obtiene UPH y UPPH por línea priorizando datos del caché en memoria."""
+        from ..config import settings as _settings
+        num_personas_default = getattr(_settings, 'NUM_PERSONAS_LINEA', 6) or 0
+        uph = 0.0
+        upph = 0.0
+        num_personas = num_personas_default
+
+        try:
+            from ..services.metrics_cache import get_metrics_cache
+            metrics_cache = get_metrics_cache()
+            if metrics_cache and linea and fecha:
+                cached = metrics_cache.get_metrics_from_cache(linea, fecha)
+                if cached:
+                    cached_uph = cached.get('uph')
+                    if cached_uph is not None:
+                        uph = float(cached_uph or 0.0)
+                    cached_num = cached.get('num_personas')
+                    if cached_num:
+                        try:
+                            num_personas = max(1, int(cached_num))
+                        except Exception:
+                            num_personas = num_personas_default or 0
+                    cached_upph = cached.get('upph')
+                    if cached_upph is not None:
+                        upph = float(cached_upph or 0.0)
+                    if uph > 0.0 or produccion_total == 0:
+                        if uph > 0.0 and (upph <= 0.0 or num_personas > 0 and abs(upph - (uph / num_personas)) > 0.01):
+                            upph = uph / num_personas if num_personas else 0.0
+                        return uph, upph
+        except Exception as cache_err:
+            logger.debug(f"Error leyendo métricas de caché: {cache_err}")
+
+        uph = self._calculate_line_uph(linea)
+        if uph < 0:
+            uph = 0.0
+        if num_personas <= 0:
+            num_personas = num_personas_default or 1
+        upph = uph / num_personas if num_personas else 0.0
+        return uph, upph
+
+    def _calculate_line_uph(self, linea: str) -> float:
+        """Calcula UPH desde SQLite local con cache ligero (última hora)."""
+        if not linea:
+            return 0.0
+        try:
+            import time
+            from ..services.dual_db import get_dual_db
+            dual_db = get_dual_db()
+            if not hasattr(self, '_uph_cache'):
+                self._uph_cache = {}
+                self._uph_cache_time = {}
+            cache_key = f"uph_{linea}"
+            cache_time_key = f"uph_time_{linea}"
+            now = time.time()
+            if cache_key in self._uph_cache and cache_time_key in self._uph_cache_time:
+                if now - self._uph_cache_time.get(cache_time_key, 0) < 5:
+                    return float(self._uph_cache[cache_key])
+            with dual_db._get_sqlite_connection(timeout=0.5) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT COUNT(*) / 2.0
+                    FROM scans_local
+                    WHERE linea = ?
+                      AND datetime(ts) >= datetime('now', '-1 hour')
+                      AND is_complete = 1
+                    """,
+                    (linea,),
+                )
+                result = cursor.fetchone()
+                uph = float(result[0]) if result and result[0] else 0.0
+            self._uph_cache[cache_key] = uph
+            self._uph_cache_time[cache_time_key] = now
+            return uph
+        except Exception as e:
+            logger.debug(f"Error calculando UPH desde SQLite: {e}")
+            return 0.0
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Sincronizar datos pendientes y cerrar la ventana correctamente."""
